@@ -1,0 +1,82 @@
+<!-- Quick Start -->
+<section id="quick-start" class="mt-5">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-rocket me-2"></i>Quick Start</h2>
+        </div>
+        <div class="card-body">
+            <h5>1. Install the Package</h5>
+            <div class="code-block">
+                <pre><code class="language-shell">dotnet add package Dapper.AuditInterceptor</code></pre>
+            </div>
+
+            <h5>2. Configure Services</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">// Program.cs or Startup.cs
+using Dapper.AuditInterceptor;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add Dapper Audit Interceptor
+builder.Services.AddDapperAuditInterceptor(
+    builder.Configuration.GetConnectionString("DefaultConnection")!);
+
+// Register audit writer
+builder.Services.AddSingleton<IAuditWriter, DefaultAuditWriter>();
+
+var app = builder.Build();</code></pre>
+            </div>
+
+            <h5>3. Use in Repository</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">public class UserRepository
+{
+    private readonly IDbConnectionFactory _connectionFactory;
+
+    public UserRepository(IDbConnectionFactory connectionFactory)
+    {
+        _connectionFactory = connectionFactory;
+    }
+
+    public async Task<int> CreateUserAsync(User user)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        
+        var sql = "INSERT INTO Users (Name, Email) VALUES (@Name, @Email)";
+        return await connection.ExecuteAsync(sql, user);
+    }
+
+    public async Task<int> UpdateUserAsync(User user)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        
+        var sql = "UPDATE Users SET Name = @Name, Email = @Email WHERE Id = @Id";
+        return await connection.ExecuteAsync(sql, user);
+    }
+}</code></pre>
+            </div>
+
+            <div class="success">
+                <h6><i class="fas fa-check-circle me-2"></i>That's it!</h6>
+                <p>Your Dapper operations are now automatically audited. The interceptor will capture before/after snapshots and store them in the configured audit storage.</p>
+            </div>
+
+            <h5>4. Verify Installation</h5>
+            <div class="code-block">
+                <pre><code class="language-sql">-- Check if audit table was created
+SELECT * FROM AuditLogs ORDER BY Timestamp DESC;
+
+-- Check for recent audit entries
+SELECT 
+    EventName,
+    TableName,
+    OperationType,
+    UserId,
+    Timestamp
+FROM AuditLogs 
+WHERE Timestamp >= DATEADD(hour, -1, GETDATE())
+ORDER BY Timestamp DESC;</code></pre>
+            </div>
+        </div>
+    </div>
+</section> 

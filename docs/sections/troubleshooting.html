@@ -1,0 +1,293 @@
+<!-- Troubleshooting -->
+<section id="troubleshooting" class="mt-5">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-bug me-2"></i>Troubleshooting</h2>
+        </div>
+        <div class="card-body">
+            <h5>Common Issues</h5>
+            
+            <h6>Audit logs not being generated</h6>
+            <div class="warning">
+                <ul>
+                    <li>Check that you're using <code>IDbConnectionFactory.CreateConnection()</code> instead of direct SqlConnection</li>
+                    <li>Verify that the SQL operations are INSERT, UPDATE, or DELETE statements</li>
+                    <li>Ensure the audit writer is properly registered in DI container</li>
+                    <li>Check application logs for any audit-related errors</li>
+                </ul>
+            </div>
+
+            <h6>Performance issues</h6>
+            <div class="warning">
+                <ul>
+                    <li>Monitor the SQL parsing overhead for complex queries</li>
+                    <li>Check if audit table has proper indexes</li>
+                    <li>Consider implementing custom audit writer for high-volume scenarios</li>
+                    <li>Review connection pooling configuration</li>
+                </ul>
+            </div>
+
+            <h6>SQL parsing errors</h6>
+            <div class="warning">
+                <ul>
+                    <li>Ensure SQL statements are valid T-SQL</li>
+                    <li>Check for unsupported SQL constructs (CTEs, complex subqueries)</li>
+                    <li>Verify parameter names match between SQL and C# code</li>
+                    <li>Review application logs for parsing error details</li>
+                </ul>
+            </div>
+
+            <h6>Connection issues</h6>
+            <div class="warning">
+                <ul>
+                    <li>Verify connection string is correct and accessible</li>
+                    <li>Check database permissions for audit table creation</li>
+                    <li>Ensure SQL Server is running and accessible</li>
+                    <li>Review firewall and network connectivity</li>
+                </ul>
+            </div>
+
+            <h6>Missing audit context</h6>
+            <div class="warning">
+                <ul>
+                    <li>Ensure <code>AddHttpContextAccessor()</code> is called in service configuration</li>
+                    <li>Verify that the application is running in an HTTP context</li>
+                    <li>Check if custom context provider is properly implemented</li>
+                    <li>Review user authentication setup</li>
+                </ul>
+            </div>
+
+            <h5>Debugging Tips</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">// Enable detailed logging
+builder.Services.AddLogging(logging =>
+{
+    logging.AddConsole();
+    logging.SetMinimumLevel(LogLevel.Debug);
+    logging.AddFilter("Dapper.AuditInterceptor", LogLevel.Debug);
+});
+
+// Custom audit writer with debugging
+public class DebugAuditWriter : IAuditWriter
+{
+    private readonly ILogger<DebugAuditWriter> _logger;
+
+    public DebugAuditWriter(ILogger<DebugAuditWriter> logger)
+    {
+        _logger = logger;
+    }
+
+    public async Task WriteAsync(AuditEntry auditEntry)
+    {
+        _logger.LogDebug("Audit Entry: {@AuditEntry}", auditEntry);
+        
+        // Your audit storage logic here
+        await Task.CompletedTask;
+    }
+}</code></pre>
+            </div>
+
+            <h5>Log Analysis</h5>
+            <div class="code-block">
+                <pre><code class="language-sql">-- Find failed audit operations
+SELECT * FROM AuditLogs 
+WHERE EventName LIKE '%Error%' 
+ORDER BY Timestamp DESC;
+
+-- Check for missing audit entries
+SELECT 
+    COUNT(*) as TotalOperations,
+    COUNT(CASE WHEN EventName IS NOT NULL THEN 1 END) as AuditedOperations,
+    COUNT(*) - COUNT(CASE WHEN EventName IS NOT NULL THEN 1 END) as MissingAudits
+FROM YourMainTable t
+LEFT JOIN AuditLogs a ON t.Id = JSON_VALUE(a.Parameters, '$.Id')
+WHERE t.CreatedDate >= DATEADD(day, -1, GETDATE());
+
+-- Check audit performance
+SELECT 
+    TableName,
+    OperationType,
+    COUNT(*) as OperationCount,
+    AVG(DATEDIFF(millisecond, Timestamp, LAG(Timestamp) OVER (ORDER BY Timestamp))) as AvgTimeMs
+FROM AuditLogs 
+WHERE Timestamp >= DATEADD(hour, -1, GETDATE())
+GROUP BY TableName, OperationType
+ORDER BY OperationCount DESC;</code></pre>
+            </div>
+
+            <h5>Performance Monitoring</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">// Performance monitoring audit writer
+public class PerformanceMonitoringAuditWriter : IAuditWriter
+{
+    private readonly IAuditWriter _innerWriter;
+    private readonly ILogger<PerformanceMonitoringAuditWriter> _logger;
+    private readonly Stopwatch _stopwatch = new Stopwatch();
+
+    public PerformanceMonitoringAuditWriter(IAuditWriter innerWriter, ILogger<PerformanceMonitoringAuditWriter> logger)
+    {
+        _innerWriter = innerWriter;
+        _logger = logger;
+    }
+
+    public async Task WriteAsync(AuditEntry auditEntry)
+    {
+        _stopwatch.Restart();
+        
+        try
+        {
+            await _innerWriter.WriteAsync(auditEntry);
+            
+            _stopwatch.Stop();
+            _logger.LogInformation("Audit write completed in {ElapsedMs}ms for {EventName}", 
+                _stopwatch.ElapsedMilliseconds, auditEntry.EventName);
+        }
+        catch (Exception ex)
+        {
+            _stopwatch.Stop();
+            _logger.LogError(ex, "Audit write failed after {ElapsedMs}ms for {EventName}", 
+                _stopwatch.ElapsedMilliseconds, auditEntry.EventName);
+            throw;
+        }
+    }
+}</code></pre>
+            </div>
+
+            <h5>Error Handling</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">// Robust error handling audit writer
+public class RobustAuditWriter : IAuditWriter
+{
+    private readonly IAuditWriter _innerWriter;
+    private readonly ILogger<RobustAuditWriter> _logger;
+    private readonly int _maxRetries;
+
+    public RobustAuditWriter(IAuditWriter innerWriter, ILogger<RobustAuditWriter> logger, int maxRetries = 3)
+    {
+        _innerWriter = innerWriter;
+        _logger = logger;
+        _maxRetries = maxRetries;
+    }
+
+    public async Task WriteAsync(AuditEntry auditEntry)
+    {
+        for (int attempt = 1; attempt <= _maxRetries; attempt++)
+        {
+            try
+            {
+                await _innerWriter.WriteAsync(auditEntry);
+                return; // Success
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Audit write attempt {Attempt} failed for {EventName}", 
+                    attempt, auditEntry.EventName);
+                
+                if (attempt == _maxRetries)
+                {
+                    _logger.LogError(ex, "All audit write attempts failed for {EventName}", 
+                        auditEntry.EventName);
+                    throw;
+                }
+                
+                // Wait before retry (exponential backoff)
+                await Task.Delay(TimeSpan.FromMilliseconds(Math.Pow(2, attempt) * 100));
+            }
+        }
+    }
+}</code></pre>
+            </div>
+
+            <h5>Configuration Validation</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">// Configuration validation service
+public class AuditConfigurationValidator
+{
+    private readonly IDbConnectionFactory _connectionFactory;
+    private readonly IAuditWriter _auditWriter;
+    private readonly ILogger<AuditConfigurationValidator> _logger;
+
+    public AuditConfigurationValidator(
+        IDbConnectionFactory connectionFactory,
+        IAuditWriter auditWriter,
+        ILogger<AuditConfigurationValidator> logger)
+    {
+        _connectionFactory = connectionFactory;
+        _auditWriter = auditWriter;
+        _logger = logger;
+    }
+
+    public async Task<bool> ValidateConfigurationAsync()
+    {
+        try
+        {
+            // Test database connection
+            using var connection = _connectionFactory.CreateConnection();
+            await connection.OpenAsync();
+            _logger.LogInformation("Database connection test successful");
+
+            // Test audit writer
+            var testEntry = new AuditEntry
+            {
+                Timestamp = DateTime.UtcNow,
+                EventName = "ConfigurationTest",
+                TableName = "TestTable",
+                OperationType = "Test"
+            };
+
+            await _auditWriter.WriteAsync(testEntry);
+            _logger.LogInformation("Audit writer test successful");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Configuration validation failed");
+            return false;
+        }
+    }
+}</code></pre>
+            </div>
+
+            <h5>Common Error Messages</h5>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Error Message</th>
+                            <th>Cause</th>
+                            <th>Solution</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>SQL parsing error</code></td>
+                            <td>Invalid or unsupported SQL syntax</td>
+                            <td>Check SQL statement validity and supported constructs</td>
+                        </tr>
+                        <tr>
+                            <td><code>Cannot load entity snapshot</code></td>
+                            <td>Missing table name or WHERE clause</td>
+                            <td>Ensure UPDATE/DELETE statements have proper WHERE clauses</td>
+                        </tr>
+                        <tr>
+                            <td><code>Failed to write audit entry</code></td>
+                            <td>Database connection or permission issues</td>
+                            <td>Check database connectivity and permissions</td>
+                        </tr>
+                        <tr>
+                            <td><code>Audit context provider not found</code></td>
+                            <td>Missing HTTP context or custom provider</td>
+                            <td>Ensure AddHttpContextAccessor() is called</td>
+                        </tr>
+                        <tr>
+                            <td><code>Connection factory not registered</code></td>
+                            <td>Missing service registration</td>
+                            <td>Call AddDapperAuditInterceptor() in service configuration</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section> 

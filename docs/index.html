@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dapper Audit Interceptor - Developer Documentation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-shield-alt me-2"></i>
+                Dapper Audit Interceptor
+            </a>
+            <span class="navbar-text">
+                <span class="badge bg-success">v1.0.0</span>
+            </span>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-3 col-lg-2 sidebar">
+                <div class="p-3">
+                    <h5 class="text-light mb-3">Documentation</h5>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#overview">
+                                <i class="fas fa-home me-2"></i>Overview
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#features">
+                                <i class="fas fa-star me-2"></i>Features
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#quick-start">
+                                <i class="fas fa-rocket me-2"></i>Quick Start
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#usage">
+                                <i class="fas fa-code me-2"></i>Usage Examples
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#api-reference">
+                                <i class="fas fa-book me-2"></i>API Reference
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#database-schema">
+                                <i class="fas fa-database me-2"></i>Database Schema
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#best-practices">
+                                <i class="fas fa-lightbulb me-2"></i>Best Practices
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#troubleshooting">
+                                <i class="fas fa-bug me-2"></i>Troubleshooting
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main Content -->
+            <main class="col-md-9 col-lg-10 main-content">
+                <div id="content-container">
+                    <!-- Content will be loaded here -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="script.js"></script>
+    <script>
+        // Load all content sections
+        $(document).ready(function() {
+            const sections = [
+                'overview',
+                'features', 
+                'quick-start',
+                'usage',
+                'api-reference',
+                'database-schema',
+                'best-practices',
+                'troubleshooting'
+            ];
+
+            sections.forEach(section => {
+                $.get(`sections/${section}.html`, function(data) {
+                    $('#content-container').append(data);
+                });
+            });
+        });
+    </script>
+</body>
+</html> 

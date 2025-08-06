@@ -1,0 +1,302 @@
+<!-- Database Schema -->
+<section id="database-schema" class="mt-5">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-database me-2"></i>Database Schema</h2>
+        </div>
+        <div class="card-body">
+            <h5>AuditLogs Table</h5>
+            <p>The default audit writer automatically creates this table if it doesn't exist.</p>
+            
+            <div class="code-block">
+                <pre><code class="language-sql">CREATE TABLE AuditLogs (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Timestamp DATETIME2 NOT NULL,
+    EventName NVARCHAR(100),
+    Query NVARCHAR(MAX),
+    Parameters NVARCHAR(MAX),
+    BeforeImage NVARCHAR(MAX),
+    AfterImage NVARCHAR(MAX),
+    TableName NVARCHAR(128),
+    UserId NVARCHAR(64),
+    UserName NVARCHAR(128),
+    IpAddress NVARCHAR(45),
+    UserAgent NVARCHAR(512),
+    MachineName NVARCHAR(128),
+    ProcessId INT,
+    ThreadId INT,
+    CustomProperties NVARCHAR(MAX),
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+);</code></pre>
+            </div>
+
+            <h5>Column Descriptions</h5>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Column</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>Id</code></td>
+                            <td>INT IDENTITY(1,1)</td>
+                            <td>Primary key, auto-incrementing</td>
+                        </tr>
+                        <tr>
+                            <td><code>Timestamp</code></td>
+                            <td>DATETIME2</td>
+                            <td>When the audit event occurred (UTC)</td>
+                        </tr>
+                        <tr>
+                            <td><code>EventName</code></td>
+                            <td>NVARCHAR(100)</td>
+                            <td>Name of the audit event (e.g., "Users_Created")</td>
+                        </tr>
+                        <tr>
+                            <td><code>Query</code></td>
+                            <td>NVARCHAR(MAX)</td>
+                            <td>The SQL query that was executed</td>
+                        </tr>
+                        <tr>
+                            <td><code>Parameters</code></td>
+                            <td>NVARCHAR(MAX)</td>
+                            <td>JSON representation of query parameters</td>
+                        </tr>
+                        <tr>
+                            <td><code>BeforeImage</code></td>
+                            <td>NVARCHAR(MAX)</td>
+                            <td>JSON representation of entity state before operation</td>
+                        </tr>
+                        <tr>
+                            <td><code>AfterImage</code></td>
+                            <td>NVARCHAR(MAX)</td>
+                            <td>JSON representation of entity state after operation</td>
+                        </tr>
+                        <tr>
+                            <td><code>TableName</code></td>
+                            <td>NVARCHAR(128)</td>
+                            <td>Name of the affected table</td>
+                        </tr>
+                        <tr>
+                            <td><code>UserId</code></td>
+                            <td>NVARCHAR(64)</td>
+                            <td>Identifier of the user who performed the operation</td>
+                        </tr>
+                        <tr>
+                            <td><code>UserName</code></td>
+                            <td>NVARCHAR(128)</td>
+                            <td>Display name of the user</td>
+                        </tr>
+                        <tr>
+                            <td><code>IpAddress</code></td>
+                            <td>NVARCHAR(45)</td>
+                            <td>IP address of the request</td>
+                        </tr>
+                        <tr>
+                            <td><code>UserAgent</code></td>
+                            <td>NVARCHAR(512)</td>
+                            <td>User agent string from the request</td>
+                        </tr>
+                        <tr>
+                            <td><code>MachineName</code></td>
+                            <td>NVARCHAR(128)</td>
+                            <td>Name of the machine where the operation occurred</td>
+                        </tr>
+                        <tr>
+                            <td><code>ProcessId</code></td>
+                            <td>INT</td>
+                            <td>Process ID of the application</td>
+                        </tr>
+                        <tr>
+                            <td><code>ThreadId</code></td>
+                            <td>INT</td>
+                            <td>Thread ID where the operation occurred</td>
+                        </tr>
+                        <tr>
+                            <td><code>CustomProperties</code></td>
+                            <td>NVARCHAR(MAX)</td>
+                            <td>JSON representation of additional custom properties</td>
+                        </tr>
+                        <tr>
+                            <td><code>CreatedAt</code></td>
+                            <td>DATETIME2</td>
+                            <td>When the audit record was created in the database</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h5>Recommended Indexes</h5>
+            <div class="code-block">
+                <pre><code class="language-sql">-- Index for querying by table name
+CREATE INDEX IX_AuditLogs_TableName ON AuditLogs (TableName);
+
+-- Index for querying by user
+CREATE INDEX IX_AuditLogs_UserId ON AuditLogs (UserId);
+
+-- Index for querying by timestamp
+CREATE INDEX IX_AuditLogs_Timestamp ON AuditLogs (Timestamp);
+
+-- Composite index for common queries
+CREATE INDEX IX_AuditLogs_TableName_Timestamp ON AuditLogs (TableName, Timestamp);
+
+-- Index for operation type queries
+CREATE INDEX IX_AuditLogs_EventName ON AuditLogs (EventName);
+
+-- Index for machine name queries
+CREATE INDEX IX_AuditLogs_MachineName ON AuditLogs (MachineName);</code></pre>
+            </div>
+
+            <h5>Sample Queries</h5>
+            <div class="code-block">
+                <pre><code class="language-sql">-- Get all audit entries for a specific table
+SELECT * FROM AuditLogs 
+WHERE TableName = 'Users' 
+ORDER BY Timestamp DESC;
+
+-- Get audit entries for a specific user
+SELECT * FROM AuditLogs 
+WHERE UserId = 'john.doe@example.com' 
+ORDER BY Timestamp DESC;
+
+-- Get recent changes to a specific record
+SELECT * FROM AuditLogs 
+WHERE TableName = 'Products' 
+AND JSON_VALUE(Parameters, '$.Id') = '123'
+ORDER BY Timestamp DESC;
+
+-- Get audit summary by operation type
+SELECT 
+    OperationType,
+    COUNT(*) as Count,
+    MIN(Timestamp) as FirstOccurrence,
+    MAX(Timestamp) as LastOccurrence
+FROM AuditLogs 
+WHERE Timestamp >= DATEADD(day, -30, GETDATE())
+GROUP BY OperationType;
+
+-- Get audit entries for a specific time range
+SELECT * FROM AuditLogs 
+WHERE Timestamp BETWEEN '2024-01-01' AND '2024-01-31'
+ORDER BY Timestamp DESC;
+
+-- Get audit entries by machine
+SELECT * FROM AuditLogs 
+WHERE MachineName = 'WEB-SERVER-01'
+ORDER BY Timestamp DESC;
+
+-- Get audit entries with specific custom properties
+SELECT * FROM AuditLogs 
+WHERE JSON_VALUE(CustomProperties, '$.TenantId') = 'tenant-123'
+ORDER BY Timestamp DESC;
+
+-- Get audit summary by table and operation
+SELECT 
+    TableName,
+    EventName,
+    COUNT(*) as OperationCount,
+    MIN(Timestamp) as FirstOperation,
+    MAX(Timestamp) as LastOperation
+FROM AuditLogs 
+WHERE Timestamp >= DATEADD(day, -7, GETDATE())
+GROUP BY TableName, EventName
+ORDER BY OperationCount DESC;</code></pre>
+            </div>
+
+            <h5>Advanced Queries</h5>
+            <div class="code-block">
+                <pre><code class="language-sql">-- Find specific field changes in UPDATE operations
+SELECT 
+    Timestamp,
+    UserName,
+    TableName,
+    JSON_VALUE(Parameters, '$.Id') as RecordId,
+    BeforeImage,
+    AfterImage
+FROM AuditLogs 
+WHERE EventName LIKE '%Modified'
+AND TableName = 'Users'
+AND JSON_VALUE(Parameters, '$.Id') = '123'
+ORDER BY Timestamp DESC;
+
+-- Compare before and after values for a specific field
+SELECT 
+    Timestamp,
+    UserName,
+    JSON_VALUE(BeforeImage, '$.Email') as OldEmail,
+    JSON_VALUE(AfterImage, '$.Email') as NewEmail
+FROM AuditLogs 
+WHERE TableName = 'Users'
+AND EventName = 'Users_Modified'
+AND JSON_VALUE(Parameters, '$.Id') = '123'
+ORDER BY Timestamp DESC;
+
+-- Find deleted records
+SELECT 
+    Timestamp,
+    UserName,
+    TableName,
+    JSON_VALUE(Parameters, '$.Id') as DeletedRecordId,
+    BeforeImage
+FROM AuditLogs 
+WHERE EventName LIKE '%Deleted'
+ORDER BY Timestamp DESC;
+
+-- Get audit statistics by hour
+SELECT 
+    DATEPART(HOUR, Timestamp) as Hour,
+    COUNT(*) as OperationCount,
+    COUNT(DISTINCT UserId) as UniqueUsers,
+    COUNT(DISTINCT TableName) as TablesModified
+FROM AuditLogs 
+WHERE Timestamp >= DATEADD(day, -1, GETDATE())
+GROUP BY DATEPART(HOUR, Timestamp)
+ORDER BY Hour;</code></pre>
+            </div>
+
+            <div class="warning">
+                <h6><i class="fas fa-exclamation-triangle me-2"></i>Performance Considerations</h6>
+                <ul>
+                    <li>The <code>Parameters</code>, <code>BeforeImage</code>, <code>AfterImage</code>, and <code>CustomProperties</code> columns store JSON data</li>
+                    <li>Consider adding indexes on frequently queried columns like <code>TableName</code>, <code>UserId</code>, and <code>Timestamp</code></li>
+                    <li>For high-volume applications, consider partitioning the audit table by date</li>
+                    <li>Implement a retention policy to archive or delete old audit records</li>
+                    <li>Use JSON_VALUE() function for querying JSON columns efficiently</li>
+                    <li>Consider creating computed columns for frequently queried JSON values</li>
+                </ul>
+            </div>
+
+            <h5>Data Retention Strategy</h5>
+            <div class="code-block">
+                <pre><code class="language-sql">-- Create a partitioned table for better performance
+CREATE PARTITION FUNCTION PF_AuditLogs_Date (DATETIME2)
+AS RANGE RIGHT FOR VALUES (
+    '2024-01-01', '2024-02-01', '2024-03-01', '2024-04-01',
+    '2024-05-01', '2024-06-01', '2024-07-01', '2024-08-01',
+    '2024-09-01', '2024-10-01', '2024-11-01', '2024-12-01'
+);
+
+-- Archive old audit records
+CREATE PROCEDURE ArchiveAuditLogs
+    @RetentionDays INT = 365
+AS
+BEGIN
+    DECLARE @CutoffDate DATETIME2 = DATEADD(day, -@RetentionDays, GETDATE());
+    
+    -- Archive to separate table
+    INSERT INTO AuditLogs_Archive
+    SELECT * FROM AuditLogs 
+    WHERE Timestamp < @CutoffDate;
+    
+    -- Delete from main table
+    DELETE FROM AuditLogs 
+    WHERE Timestamp < @CutoffDate;
+END;</code></pre>
+            </div>
+        </div>
+    </div>
+</section> 

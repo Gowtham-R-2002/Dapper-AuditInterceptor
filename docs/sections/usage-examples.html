@@ -1,0 +1,215 @@
+<!-- Usage Examples -->
+<section id="usage" class="mt-5">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-code me-2"></i>Usage Examples</h2>
+        </div>
+        <div class="card-body">
+            <h5>Basic CRUD Operations</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">public class ProductRepository
+{
+    private readonly IDbConnectionFactory _connectionFactory;
+
+    public ProductRepository(IDbConnectionFactory connectionFactory)
+    {
+        _connectionFactory = connectionFactory;
+    }
+
+    // INSERT - Captures the new entity state
+    public async Task<int> CreateProductAsync(Product product)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var sql = @"INSERT INTO Products (Name, Price, CategoryId) 
+                    VALUES (@Name, @Price, @CategoryId)";
+        return await connection.ExecuteAsync(sql, product);
+    }
+
+    // UPDATE - Captures before and after states
+    public async Task<int> UpdateProductAsync(Product product)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var sql = @"UPDATE Products 
+                    SET Name = @Name, Price = @Price, CategoryId = @CategoryId 
+                    WHERE Id = @Id";
+        return await connection.ExecuteAsync(sql, product);
+    }
+
+    // DELETE - Captures the entity before deletion
+    public async Task<int> DeleteProductAsync(int id)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var sql = "DELETE FROM Products WHERE Id = @Id";
+        return await connection.ExecuteAsync(sql, new { Id = id });
+    }
+}</code></pre>
+            </div>
+
+            <h5>Complex Queries</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">// Batch operations are supported
+public async Task<int> UpdateProductPricesAsync(decimal discountPercentage)
+{
+    using var connection = _connectionFactory.CreateConnection();
+    var sql = @"UPDATE Products 
+                SET Price = Price * (1 - @DiscountPercentage) 
+                WHERE CategoryId IN (1, 2, 3)";
+    return await connection.ExecuteAsync(sql, new { DiscountPercentage = discountPercentage });
+}
+
+// Parameterized queries with complex WHERE clauses
+public async Task<int> UpdateUserStatusAsync(int userId, string status, string reason)
+{
+    using var connection = _connectionFactory.CreateConnection();
+    var sql = @"UPDATE Users 
+                SET Status = @Status, 
+                    LastModified = GETDATE(), 
+                    ModifiedReason = @Reason 
+                WHERE Id = @UserId AND IsActive = 1";
+    return await connection.ExecuteAsync(sql, new { UserId = userId, Status = status, Reason = reason });
+}</code></pre>
+            </div>
+
+            <h5>Transaction Support</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">public async Task TransferFundsAsync(int fromAccountId, int toAccountId, decimal amount)
+{
+    using var connection = _connectionFactory.CreateConnection();
+    using var transaction = connection.BeginTransaction();
+
+    try
+    {
+        // Both operations will be audited
+        var debitSql = "UPDATE Accounts SET Balance = Balance - @Amount WHERE Id = @AccountId";
+        var creditSql = "UPDATE Accounts SET Balance = Balance + @Amount WHERE Id = @AccountId";
+
+        await connection.ExecuteAsync(debitSql, new { Amount = amount, AccountId = fromAccountId }, transaction);
+        await connection.ExecuteAsync(creditSql, new { Amount = amount, AccountId = toAccountId }, transaction);
+
+        transaction.Commit();
+    }
+    catch
+    {
+        transaction.Rollback();
+        throw;
+    }
+}</code></pre>
+            </div>
+
+            <h5>Custom Audit Context</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">public class CustomAuditContextProvider : IAuditContextProvider
+{
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ICurrentUserService _currentUserService;
+
+    public CustomAuditContextProvider(
+        IHttpContextAccessor httpContextAccessor,
+        ICurrentUserService currentUserService)
+    {
+        _httpContextAccessor = httpContextAccessor;
+        _currentUserService = currentUserService;
+    }
+
+    public AuditContext GetCurrentContext()
+    {
+        var context = _httpContextAccessor.HttpContext;
+        var currentUser = _currentUserService.GetCurrentUser();
+
+        return new AuditContext
+        {
+            UserId = currentUser?.Id?.ToString() ?? "anonymous",
+            UserName = currentUser?.Name ?? "Anonymous User",
+            IpAddress = context?.Connection?.RemoteIpAddress?.ToString() ?? "unknown",
+            UserAgent = context?.Request?.Headers["User-Agent"].FirstOrDefault() ?? "unknown",
+            CustomProperties = new Dictionary<string, object>
+            {
+                ["TenantId"] = currentUser?.TenantId ?? "default",
+                ["SessionId"] = context?.Session?.Id ?? "unknown",
+                ["RequestId"] = context?.TraceIdentifier ?? "unknown"
+            }
+        };
+    }
+}</code></pre>
+            </div>
+
+            <h5>Selective Auditing</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">public class SelectiveAuditWriter : IAuditWriter
+{
+    private readonly IAuditWriter _innerWriter;
+    private readonly HashSet<string> _auditedTables;
+    private readonly HashSet<string> _excludedOperations;
+
+    public SelectiveAuditWriter(IAuditWriter innerWriter)
+    {
+        _innerWriter = innerWriter;
+        _auditedTables = new HashSet<string> { "Users", "Products", "Orders", "Payments" };
+        _excludedOperations = new HashSet<string> { "AuditLogs", "SystemLogs" };
+    }
+
+    public async Task WriteAsync(AuditEntry auditEntry)
+    {
+        // Skip system tables
+        if (_excludedOperations.Contains(auditEntry.TableName))
+            return;
+
+        // Only audit specific tables
+        if (_auditedTables.Contains(auditEntry.TableName))
+        {
+            await _innerWriter.WriteAsync(auditEntry);
+        }
+    }
+}</code></pre>
+            </div>
+
+            <h5>Custom Audit Storage</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">public class ElasticsearchAuditWriter : IAuditWriter
+{
+    private readonly ElasticClient _elasticClient;
+    private readonly ILogger<ElasticsearchAuditWriter> _logger;
+
+    public ElasticsearchAuditWriter(ElasticClient elasticClient, ILogger<ElasticsearchAuditWriter> logger)
+    {
+        _elasticClient = elasticClient;
+        _logger = logger;
+    }
+
+    public async Task WriteAsync(AuditEntry auditEntry)
+    {
+        try
+        {
+            var document = new
+            {
+                timestamp = auditEntry.Timestamp,
+                event_name = auditEntry.EventName,
+                table_name = auditEntry.TableName,
+                operation_type = auditEntry.OperationType,
+                user_id = auditEntry.UserId,
+                user_name = auditEntry.UserName,
+                ip_address = auditEntry.IpAddress,
+                before_image = auditEntry.BeforeImage,
+                after_image = auditEntry.AfterImage,
+                query = auditEntry.Query,
+                parameters = auditEntry.Parameters,
+                custom_properties = auditEntry.CustomProperties
+            };
+
+            var response = await _elasticClient.IndexDocumentAsync(document);
+            
+            if (!response.IsValid)
+            {
+                _logger.LogError("Failed to write audit entry to Elasticsearch: {Error}", response.OriginalException);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error writing audit entry to Elasticsearch");
+        }
+    }
+}</code></pre>
+            </div>
+        </div>
+    </div>
+</section> 

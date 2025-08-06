@@ -1,0 +1,323 @@
+<!-- API Reference -->
+<section id="api-reference" class="mt-5">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-book me-2"></i>API Reference</h2>
+        </div>
+        <div class="card-body">
+            <h5>Core Classes</h5>
+            
+            <h6><code>AuditableDbConnection</code></h6>
+            <p>Wraps SQL connections to provide audit interception capabilities.</p>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Property/Method</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>ConnectionString</code></td>
+                            <td>string</td>
+                            <td>Gets or sets the connection string</td>
+                        </tr>
+                        <tr>
+                            <td><code>Database</code></td>
+                            <td>string</td>
+                            <td>Gets the database name</td>
+                        </tr>
+                        <tr>
+                            <td><code>State</code></td>
+                            <td>ConnectionState</td>
+                            <td>Gets the connection state</td>
+                        </tr>
+                        <tr>
+                            <td><code>CreateCommand()</code></td>
+                            <td>DbCommand</td>
+                            <td>Creates an auditable command</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h6><code>AuditEntry</code></h6>
+            <p>Represents an audit log entry with complete before/after information.</p>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>Timestamp</code></td>
+                            <td>DateTime</td>
+                            <td>When the audit event occurred</td>
+                        </tr>
+                        <tr>
+                            <td><code>EventName</code></td>
+                            <td>string</td>
+                            <td>Name of the audit event</td>
+                        </tr>
+                        <tr>
+                            <td><code>Query</code></td>
+                            <td>string</td>
+                            <td>The SQL query that was executed</td>
+                        </tr>
+                        <tr>
+                            <td><code>Parameters</code></td>
+                            <td>Dictionary&lt;string, object&gt;</td>
+                            <td>Query parameters</td>
+                        </tr>
+                        <tr>
+                            <td><code>BeforeImage</code></td>
+                            <td>Dictionary&lt;string, object&gt;</td>
+                            <td>Entity state before the operation</td>
+                        </tr>
+                        <tr>
+                            <td><code>AfterImage</code></td>
+                            <td>Dictionary&lt;string, object&gt;</td>
+                            <td>Entity state after the operation</td>
+                        </tr>
+                        <tr>
+                            <td><code>TableName</code></td>
+                            <td>string</td>
+                            <td>Affected table name</td>
+                        </tr>
+                        <tr>
+                            <td><code>OperationType</code></td>
+                            <td>string</td>
+                            <td>Type of operation (Insert/Update/Delete)</td>
+                        </tr>
+                        <tr>
+                            <td><code>UserId</code></td>
+                            <td>string</td>
+                            <td>User who performed the operation</td>
+                        </tr>
+                        <tr>
+                            <td><code>UserName</code></td>
+                            <td>string</td>
+                            <td>Display name of the user</td>
+                        </tr>
+                        <tr>
+                            <td><code>IpAddress</code></td>
+                            <td>string</td>
+                            <td>IP address of the request</td>
+                        </tr>
+                        <tr>
+                            <td><code>UserAgent</code></td>
+                            <td>string</td>
+                            <td>User agent string</td>
+                        </tr>
+                        <tr>
+                            <td><code>MachineName</code></td>
+                            <td>string</td>
+                            <td>Machine where the operation occurred</td>
+                        </tr>
+                        <tr>
+                            <td><code>ProcessId</code></td>
+                            <td>int</td>
+                            <td>Process ID</td>
+                        </tr>
+                        <tr>
+                            <td><code>ThreadId</code></td>
+                            <td>int</td>
+                            <td>Thread ID</td>
+                        </tr>
+                        <tr>
+                            <td><code>CustomProperties</code></td>
+                            <td>Dictionary&lt;string, object&gt;</td>
+                            <td>Additional custom properties</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h6><code>AuditContext</code></h6>
+            <p>Contains context information for audit operations.</p>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>UserId</code></td>
+                            <td>string</td>
+                            <td>Unique identifier of the user</td>
+                        </tr>
+                        <tr>
+                            <td><code>UserName</code></td>
+                            <td>string</td>
+                            <td>Display name of the user</td>
+                        </tr>
+                        <tr>
+                            <td><code>IpAddress</code></td>
+                            <td>string</td>
+                            <td>IP address of the request</td>
+                        </tr>
+                        <tr>
+                            <td><code>UserAgent</code></td>
+                            <td>string</td>
+                            <td>User agent string</td>
+                        </tr>
+                        <tr>
+                            <td><code>CustomProperties</code></td>
+                            <td>Dictionary&lt;string, object&gt;</td>
+                            <td>Additional custom properties</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h6><code>IAuditWriter</code></h6>
+            <p>Interface for implementing custom audit storage strategies.</p>
+            <div class="code-block">
+                <pre><code class="language-csharp">public interface IAuditWriter
+{
+    Task WriteAsync(AuditEntry auditEntry);
+}</code></pre>
+            </div>
+
+            <h6><code>IAuditContextProvider</code></h6>
+            <p>Interface for providing audit context information.</p>
+            <div class="code-block">
+                <pre><code class="language-csharp">public interface IAuditContextProvider
+{
+    AuditContext GetCurrentContext();
+}</code></pre>
+            </div>
+
+            <h6><code>IDbConnectionFactory</code></h6>
+            <p>Interface for creating database connections with audit capabilities.</p>
+            <div class="code-block">
+                <pre><code class="language-csharp">public interface IDbConnectionFactory
+{
+    DbConnection CreateConnection();
+}</code></pre>
+            </div>
+
+            <h5>Extension Methods</h5>
+            
+            <h6><code>ServiceCollectionExtensions.AddDapperAuditInterceptor</code></h6>
+            <p>Extension method to register Dapper Audit Interceptor services.</p>
+            <div class="code-block">
+                <pre><code class="language-csharp">public static IServiceCollection AddDapperAuditInterceptor(
+    this IServiceCollection services,
+    string connectionString)</code></pre>
+            </div>
+
+            <h5>Enums</h5>
+            
+            <h6><code>SqlOperationType</code></h6>
+            <p>Enumeration of supported SQL operation types.</p>
+            <div class="code-block">
+                <pre><code class="language-csharp">public enum SqlOperationType
+{
+    Insert,
+    Update,
+    Delete,
+    Unknown
+}</code></pre>
+            </div>
+
+            <h5>Helper Classes</h5>
+            
+            <h6><code>SqlStatement</code></h6>
+            <p>Represents a parsed SQL statement with operation details.</p>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>OperationType</code></td>
+                            <td>SqlOperationType</td>
+                            <td>Type of SQL operation</td>
+                        </tr>
+                        <tr>
+                            <td><code>SchemaName</code></td>
+                            <td>string</td>
+                            <td>Database schema name</td>
+                        </tr>
+                        <tr>
+                            <td><code>TableName</code></td>
+                            <td>string</td>
+                            <td>Target table name</td>
+                        </tr>
+                        <tr>
+                            <td><code>WhereClause</code></td>
+                            <td>string</td>
+                            <td>WHERE clause for UPDATE/DELETE operations</td>
+                        </tr>
+                        <tr>
+                            <td><code>InsertColumns</code></td>
+                            <td>List&lt;string&gt;</td>
+                            <td>Column names for INSERT operations</td>
+                        </tr>
+                        <tr>
+                            <td><code>InsertValues</code></td>
+                            <td>List&lt;InsertValue&gt;</td>
+                            <td>Values for INSERT operations</td>
+                        </tr>
+                        <tr>
+                            <td><code>UpdateFields</code></td>
+                            <td>List&lt;UpdateField&gt;</td>
+                            <td>Fields to update for UPDATE operations</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h6><code>UpdateField</code></h6>
+            <p>Represents a field in an UPDATE statement.</p>
+            <div class="code-block">
+                <pre><code class="language-csharp">public class UpdateField
+{
+    public string ColumnName { get; set; } = "";
+    public string? LiteralValue { get; set; }
+    public string? ParameterName { get; set; }
+    public bool IsParameter => !string.IsNullOrEmpty(ParameterName);
+    
+    public object? GetParameterValue(Dictionary<string, object> parameters)
+    {
+        if (!IsParameter) return LiteralValue;
+        return parameters.TryGetValue(ParameterName!, out var value) ? value : null;
+    }
+}</code></pre>
+            </div>
+
+            <h6><code>InsertValue</code></h6>
+            <p>Represents a value in an INSERT statement.</p>
+            <div class="code-block">
+                <pre><code class="language-csharp">public class InsertValue
+{
+    public string? LiteralValue { get; set; }
+    public string? ParameterName { get; set; }
+    public bool IsParameter => !string.IsNullOrEmpty(ParameterName);
+    
+    public object? GetParameterValue(Dictionary<string, object> parameters)
+    {
+        if (!IsParameter) return LiteralValue;
+        return parameters.TryGetValue(ParameterName!, out var value) ? value : null;
+    }
+}</code></pre>
+            </div>
+        </div>
+    </div>
+</section> 

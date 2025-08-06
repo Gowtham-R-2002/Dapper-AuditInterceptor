@@ -1,0 +1,359 @@
+<!-- Best Practices -->
+<section id="best-practices" class="mt-5">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-lightbulb me-2"></i>Best Practices</h2>
+        </div>
+        <div class="card-body">
+            <h5>Performance Optimization</h5>
+            <div class="highlight">
+                <ul>
+                    <li><strong>Use Connection Pooling:</strong> The interceptor works with connection pooling for optimal performance</li>
+                    <li><strong>Batch Operations:</strong> Multiple operations in a single transaction are more efficient</li>
+                    <li><strong>Selective Auditing:</strong> Consider implementing custom logic to skip auditing for certain operations</li>
+                    <li><strong>Async Operations:</strong> Always use async methods for database operations</li>
+                    <li><strong>Index Optimization:</strong> Ensure proper indexes on audit table for query performance</li>
+                    <li><strong>Data Retention:</strong> Implement automated cleanup of old audit records</li>
+                </ul>
+            </div>
+
+            <h5>Security Considerations</h5>
+            <div class="warning">
+                <ul>
+                    <li><strong>Sensitive Data:</strong> Be careful with sensitive data in audit logs - consider encryption or masking</li>
+                    <li><strong>Access Control:</strong> Implement proper access controls for audit data</li>
+                    <li><strong>Data Retention:</strong> Establish clear data retention policies for audit logs</li>
+                    <li><strong>Compliance:</strong> Ensure audit logs meet your regulatory compliance requirements</li>
+                    <li><strong>Data Masking:</strong> Consider masking sensitive fields like passwords, SSNs, credit card numbers</li>
+                    <li><strong>Audit Access:</strong> Log access to audit data itself for security monitoring</li>
+                </ul>
+            </div>
+
+            <h5>Monitoring and Maintenance</h5>
+            <div class="success">
+                <ul>
+                    <li><strong>Log Monitoring:</strong> Monitor audit log generation for performance issues</li>
+                    <li><strong>Storage Management:</strong> Regularly clean up old audit records</li>
+                    <li><strong>Error Handling:</strong> Implement proper error handling for audit failures</li>
+                    <li><strong>Testing:</strong> Test audit functionality in your CI/CD pipeline</li>
+                    <li><strong>Health Checks:</strong> Implement health checks for audit system components</li>
+                    <li><strong>Alerting:</strong> Set up alerts for audit system failures or performance degradation</li>
+                </ul>
+            </div>
+
+            <h5>Customization Tips</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">// Example: Selective auditing based on table name
+public class SelectiveAuditWriter : IAuditWriter
+{
+    private readonly IAuditWriter _innerWriter;
+    private readonly HashSet<string> _auditedTables;
+
+    public SelectiveAuditWriter(IAuditWriter innerWriter)
+    {
+        _innerWriter = innerWriter;
+        _auditedTables = new HashSet<string> { "Users", "Products", "Orders" };
+    }
+
+    public async Task WriteAsync(AuditEntry auditEntry)
+    {
+        if (_auditedTables.Contains(auditEntry.TableName))
+        {
+            await _innerWriter.WriteAsync(auditEntry);
+        }
+    }
+}</code></pre>
+            </div>
+
+            <h5>Data Masking Implementation</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">public class DataMaskingAuditWriter : IAuditWriter
+{
+    private readonly IAuditWriter _innerWriter;
+    private readonly HashSet<string> _sensitiveFields;
+
+    public DataMaskingAuditWriter(IAuditWriter innerWriter)
+    {
+        _innerWriter = innerWriter;
+        _sensitiveFields = new HashSet<string> { "Password", "SSN", "CreditCardNumber", "Email" };
+    }
+
+    public async Task WriteAsync(AuditEntry auditEntry)
+    {
+        // Mask sensitive data in before and after images
+        var maskedBeforeImage = MaskSensitiveData(auditEntry.BeforeImage);
+        var maskedAfterImage = MaskSensitiveData(auditEntry.AfterImage);
+
+        var maskedEntry = new AuditEntry
+        {
+            Timestamp = auditEntry.Timestamp,
+            EventName = auditEntry.EventName,
+            Query = auditEntry.Query,
+            Parameters = auditEntry.Parameters,
+            BeforeImage = maskedBeforeImage,
+            AfterImage = maskedAfterImage,
+            TableName = auditEntry.TableName,
+            OperationType = auditEntry.OperationType,
+            UserId = auditEntry.UserId,
+            UserName = auditEntry.UserName,
+            IpAddress = auditEntry.IpAddress,
+            UserAgent = auditEntry.UserAgent,
+            MachineName = auditEntry.MachineName,
+            ProcessId = auditEntry.ProcessId,
+            ThreadId = auditEntry.ThreadId,
+            CustomProperties = auditEntry.CustomProperties
+        };
+
+        await _innerWriter.WriteAsync(maskedEntry);
+    }
+
+    private Dictionary<string, object> MaskSensitiveData(Dictionary<string, object> data)
+    {
+        if (data == null) return new Dictionary<string, object>();
+
+        var maskedData = new Dictionary<string, object>();
+        foreach (var kvp in data)
+        {
+            if (_sensitiveFields.Contains(kvp.Key))
+            {
+                maskedData[kvp.Key] = "***MASKED***";
+            }
+            else
+            {
+                maskedData[kvp.Key] = kvp.Value;
+            }
+        }
+        return maskedData;
+    }
+}</code></pre>
+            </div>
+
+            <h5>Performance Monitoring</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">public class PerformanceMonitoringAuditWriter : IAuditWriter
+{
+    private readonly IAuditWriter _innerWriter;
+    private readonly ILogger<PerformanceMonitoringAuditWriter> _logger;
+    private readonly IMetricsCollector _metricsCollector;
+
+    public PerformanceMonitoringAuditWriter(
+        IAuditWriter innerWriter, 
+        ILogger<PerformanceMonitoringAuditWriter> logger,
+        IMetricsCollector metricsCollector)
+    {
+        _innerWriter = innerWriter;
+        _logger = logger;
+        _metricsCollector = metricsCollector;
+    }
+
+    public async Task WriteAsync(AuditEntry auditEntry)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        
+        try
+        {
+            await _innerWriter.WriteAsync(auditEntry);
+            
+            stopwatch.Stop();
+            _metricsCollector.RecordAuditWriteTime(stopwatch.ElapsedMilliseconds);
+            _metricsCollector.IncrementAuditWriteCount(auditEntry.TableName, auditEntry.OperationType);
+            
+            _logger.LogDebug("Audit write completed in {ElapsedMs}ms for {EventName}", 
+                stopwatch.ElapsedMilliseconds, auditEntry.EventName);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _metricsCollector.IncrementAuditWriteErrorCount();
+            _logger.LogError(ex, "Audit write failed after {ElapsedMs}ms for {EventName}", 
+                stopwatch.ElapsedMilliseconds, auditEntry.EventName);
+            throw;
+        }
+    }
+}</code></pre>
+            </div>
+
+            <h5>Health Check Implementation</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">public class AuditHealthCheck : IHealthCheck
+{
+    private readonly IDbConnectionFactory _connectionFactory;
+    private readonly IAuditWriter _auditWriter;
+
+    public AuditHealthCheck(IDbConnectionFactory connectionFactory, IAuditWriter auditWriter)
+    {
+        _connectionFactory = connectionFactory;
+        _auditWriter = auditWriter;
+    }
+
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Test database connection
+            using var connection = _connectionFactory.CreateConnection();
+            await connection.OpenAsync(cancellationToken);
+
+            // Test audit writer
+            var testEntry = new AuditEntry
+            {
+                Timestamp = DateTime.UtcNow,
+                EventName = "HealthCheck",
+                TableName = "HealthCheck",
+                OperationType = "HealthCheck"
+            };
+
+            await _auditWriter.WriteAsync(testEntry);
+
+            return HealthCheckResult.Healthy("Audit system is functioning correctly");
+        }
+        catch (Exception ex)
+        {
+            return HealthCheckResult.Unhealthy("Audit system health check failed", ex);
+        }
+    }
+}
+
+// Registration
+builder.Services.AddHealthChecks()
+    .AddCheck<AuditHealthCheck>("audit-system");</code></pre>
+            </div>
+
+            <h5>Configuration Best Practices</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">// Structured configuration
+public class AuditConfiguration
+{
+    public bool Enabled { get; set; } = true;
+    public string[] ExcludedTables { get; set; } = Array.Empty<string>();
+    public string[] ExcludedOperations { get; set; } = Array.Empty<string>();
+    public bool MaskSensitiveData { get; set; } = true;
+    public string[] SensitiveFields { get; set; } = new[] { "Password", "SSN", "CreditCardNumber" };
+    public int RetentionDays { get; set; } = 365;
+    public bool EnablePerformanceMonitoring { get; set; } = false;
+}
+
+// Usage in startup
+builder.Services.Configure<AuditConfiguration>(
+    builder.Configuration.GetSection("Audit"));
+
+builder.Services.AddSingleton<IAuditWriter>(provider =>
+{
+    var config = provider.GetRequiredService<IOptions<AuditConfiguration>>().Value;
+    var logger = provider.GetRequiredService<ILogger<DefaultAuditWriter>>();
+    
+    IAuditWriter writer = new DefaultAuditWriter(config, logger);
+    
+    if (config.MaskSensitiveData)
+    {
+        writer = new DataMaskingAuditWriter(writer);
+    }
+    
+    if (config.EnablePerformanceMonitoring)
+    {
+        writer = new PerformanceMonitoringAuditWriter(writer, logger, provider.GetRequiredService<IMetricsCollector>());
+    }
+    
+    return new SelectiveAuditWriter(writer, config.ExcludedTables, config.ExcludedOperations);
+});</code></pre>
+            </div>
+
+            <h5>Error Handling and Resilience</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">public class ResilientAuditWriter : IAuditWriter
+{
+    private readonly IAuditWriter _innerWriter;
+    private readonly ILogger<ResilientAuditWriter> _logger;
+    private readonly IAsyncPolicy<object> _retryPolicy;
+    private readonly IAsyncPolicy<object> _circuitBreakerPolicy;
+
+    public ResilientAuditWriter(IAuditWriter innerWriter, ILogger<ResilientAuditWriter> logger)
+    {
+        _innerWriter = innerWriter;
+        _logger = logger;
+        
+        _retryPolicy = Policy<object>
+            .Handle<Exception>()
+            .WaitAndRetryAsync(3, retryAttempt => 
+                TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+        
+        _circuitBreakerPolicy = Policy<object>
+            .Handle<Exception>()
+            .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
+    }
+
+    public async Task WriteAsync(AuditEntry auditEntry)
+    {
+        try
+        {
+            await _retryPolicy.WrapAsync(_circuitBreakerPolicy)
+                .ExecuteAsync(async () =>
+                {
+                    await _innerWriter.WriteAsync(auditEntry);
+                    return Task.CompletedTask;
+                });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to write audit entry after retries: {EventName}", 
+                auditEntry.EventName);
+            
+            // Consider fallback storage or alerting
+            // Don't throw to avoid breaking the main application flow
+        }
+    }
+}</code></pre>
+            </div>
+
+            <h5>Testing Strategies</h5>
+            <div class="code-block">
+                <pre><code class="language-csharp">[Test]
+public async Task AuditInterceptor_ShouldCaptureEntityChanges()
+{
+    // Arrange
+    var auditWriter = new InMemoryAuditWriter();
+    var connectionFactory = CreateAuditableConnectionFactory(auditWriter);
+    var repository = new UserRepository(connectionFactory);
+
+    // Act
+    var user = new User { Name = "John Doe", Email = "john@example.com" };
+    await repository.CreateUserAsync(user);
+
+    // Assert
+    var auditEntries = auditWriter.GetAuditEntries();
+    Assert.That(auditEntries, Has.Count.EqualTo(1));
+    
+    var entry = auditEntries.First();
+    Assert.That(entry.EventName, Is.EqualTo("Users_Created"));
+    Assert.That(entry.TableName, Is.EqualTo("Users"));
+    Assert.That(entry.AfterImage["Name"], Is.EqualTo("John Doe"));
+}
+
+public class InMemoryAuditWriter : IAuditWriter
+{
+    private readonly List<AuditEntry> _entries = new();
+
+    public async Task WriteAsync(AuditEntry auditEntry)
+    {
+        _entries.Add(auditEntry);
+        await Task.CompletedTask;
+    }
+
+    public List<AuditEntry> GetAuditEntries() => _entries.ToList();
+}</code></pre>
+            </div>
+
+            <h5>Deployment Considerations</h5>
+            <div class="highlight">
+                <ul>
+                    <li><strong>Database Migration:</strong> Ensure audit table creation is part of your database migration strategy</li>
+                    <li><strong>Environment Configuration:</strong> Use different audit configurations for development, staging, and production</li>
+                    <li><strong>Monitoring Setup:</strong> Configure monitoring and alerting for audit system health</li>
+                    <li><strong>Backup Strategy:</strong> Include audit data in your backup and disaster recovery plans</li>
+                    <li><strong>Performance Testing:</strong> Test audit performance under expected load</li>
+                    <li><strong>Rollback Plan:</strong> Have a plan to disable auditing if needed in emergency situations</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section> 

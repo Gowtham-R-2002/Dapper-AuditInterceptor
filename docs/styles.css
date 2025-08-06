@@ -11,6 +11,10 @@
     --danger-color: #f85149;
 }
 
+div {
+    color : white;
+}
+
 body {
     background-color: var(--dark-bg);
     color: var(--text-primary);

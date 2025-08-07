@@ -1,9 +1,7 @@
 using System.Data;
 using System.Data.Common;
 using Microsoft.Data.SqlClient;
-using Audit.Core;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 
 namespace Dapper.AuditInterceptor;
 
@@ -43,7 +41,7 @@ public class AuditableDbConnection : DbConnection
     protected override DbCommand CreateDbCommand()
     {
         var command = _connection.CreateCommand();
-        return new EntitySnapshotAuditableDbCommand(command, _connection, _logger, _auditContextProvider, _auditWriter);
+        return new EntitySnapshotAuditableDbCommand(command, _connection, _logger, _auditWriter, _auditContextProvider);
     }
 
     protected override void Dispose(bool disposing)

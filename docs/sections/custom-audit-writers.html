@@ -1,0 +1,302 @@
+<!-- Custom Audit Writers -->
+<section id="custom-audit-writers">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-pen-fancy me-2"></i>Custom Audit Writers</h2>
+        </div>
+        <div class="card-body">
+            <p class="lead">
+                Dapper Audit Interceptor v2.0.0 provides maximum flexibility for custom audit storage implementations. You can create custom audit writers for any storage destination or processing logic.
+            </p>
+
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Note:</strong> The library provides 4 different ways to register custom audit writers, giving you complete control over your audit strategy.
+            </div>
+
+            <h3><i class="fas fa-cog me-2"></i>Registration Methods</h3>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-rocket me-2"></i>Method 1: Basic Registration</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Uses the default database storage</p>
+                            <pre><code class="language-csharp">builder.Services.AddDapperAuditInterceptor(
+    builder.Configuration.GetConnectionString("DefaultConnection")!);</code></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-cube me-2"></i>Method 2: Custom Instance</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Provide a custom audit writer instance</p>
+                            <pre><code class="language-csharp">builder.Services.AddDapperAuditInterceptor(
+    connectionString,
+    new CustomAuditWriter(logger, filePath));</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-industry me-2"></i>Method 3: Factory Pattern</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Use a factory to create the audit writer</p>
+                            <pre><code class="language-csharp">builder.Services.AddDapperAuditInterceptor(
+    connectionString,
+    provider => new CustomAuditWriter(provider));</code></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-tools me-2"></i>Method 4: Manual Registration</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Maximum control with manual registration</p>
+                            <pre><code class="language-csharp">builder.Services.AddSingleton&lt;IAuditWriter&gt;(provider => 
+    new CustomAuditWriter(provider));
+builder.Services.AddDapperAuditInterceptorCore(connectionString);</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="mt-4"><i class="fas fa-code me-2"></i>Implementation Examples</h3>
+
+            <h4><i class="fas fa-file-alt me-2"></i>File-Based Audit Writer</h4>
+            <pre><code class="language-csharp">public class FileAuditWriter : IAuditWriter
+{
+    private readonly ILogger&lt;FileAuditWriter&gt; _logger;
+    private readonly string _filePath;
+
+    public FileAuditWriter(ILogger&lt;FileAuditWriter&gt; logger, string filePath)
+    {
+        _logger = logger;
+        _filePath = filePath;
+    }
+
+    public async Task WriteAsync(AuditEntry entry)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(entry, new JsonSerializerOptions 
+            { 
+                WriteIndented = true 
+            });
+            
+            await File.AppendAllTextAsync(_filePath, json + Environment.NewLine);
+            _logger.LogInformation("Audit written to file: {EventName}", entry.EventName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to write audit to file");
+        }
+    }
+}</code></pre>
+
+            <h4><i class="fas fa-envelope me-2"></i>Email Audit Writer</h4>
+            <pre><code class="language-csharp">public class EmailAuditWriter : IAuditWriter
+{
+    private readonly ILogger&lt;EmailAuditWriter&gt; _logger;
+    private readonly string _adminEmail;
+    private readonly IEmailService _emailService;
+
+    public EmailAuditWriter(ILogger&lt;EmailAuditWriter&gt; logger, 
+                          string adminEmail, 
+                          IEmailService emailService)
+    {
+        _logger = logger;
+        _adminEmail = adminEmail;
+        _emailService = emailService;
+    }
+
+    public async Task WriteAsync(AuditEntry entry)
+    {
+        try
+        {
+            if (entry.OperationType == "Delete" || 
+                entry.TableName == "Users" || 
+                entry.TableName == "Permissions")
+            {
+                var subject = $"Critical Audit Event: {entry.EventName}";
+                var body = $@"
+                    Table: {entry.TableName}
+                    Operation: {entry.OperationType}
+                    User: {entry.UserName}
+                    Timestamp: {entry.Timestamp}
+                    Query: {entry.Query}
+                ";
+
+                await _emailService.SendEmailAsync(_adminEmail, subject, body);
+                _logger.LogInformation("Audit email sent for: {EventName}", entry.EventName);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send audit email");
+        }
+    }
+}</code></pre>
+
+            <h4><i class="fas fa-cloud me-2"></i>External API Audit Writer</h4>
+            <pre><code class="language-csharp">public class ApiAuditWriter : IAuditWriter
+{
+    private readonly ILogger&lt;ApiAuditWriter&gt; _logger;
+    private readonly HttpClient _httpClient;
+    private readonly string _apiEndpoint;
+
+    public ApiAuditWriter(ILogger&lt;ApiAuditWriter&gt; logger, 
+                         HttpClient httpClient, 
+                         string apiEndpoint)
+    {
+        _logger = logger;
+        _httpClient = httpClient;
+        _apiEndpoint = apiEndpoint;
+    }
+
+    public async Task WriteAsync(AuditEntry entry)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(entry);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            
+            var response = await _httpClient.PostAsync(_apiEndpoint, content);
+            response.EnsureSuccessStatusCode();
+            
+            _logger.LogInformation("Audit sent to API: {EventName}", entry.EventName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send audit to API");
+        }
+    }
+}</code></pre>
+
+            <h4><i class="fas fa-database me-2"></i>Custom Database Audit Writer</h4>
+            <pre><code class="language-csharp">public class CustomDatabaseAuditWriter : IAuditWriter
+{
+    private readonly ILogger&lt;CustomDatabaseAuditWriter&gt; _logger;
+    private readonly string _connectionString;
+
+    public CustomDatabaseAuditWriter(ILogger&lt;CustomDatabaseAuditWriter&gt; logger, 
+                                   string connectionString)
+    {
+        _logger = logger;
+        _connectionString = connectionString;
+    }
+
+    public async Task WriteAsync(AuditEntry entry)
+    {
+        try
+        {
+            using var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync();
+
+            var sql = @"
+                INSERT INTO CustomAuditLogs (
+                    Timestamp, EventName, TableName, OperationType,
+                    UserId, UserName, IpAddress, Query,
+                    BeforeImage, AfterImage, CustomProperties
+                ) VALUES (
+                    @Timestamp, @EventName, @TableName, @OperationType,
+                    @UserId, @UserName, @IpAddress, @Query,
+                    @BeforeImage, @AfterImage, @CustomProperties
+                )";
+
+            var parameters = new
+            {
+                entry.Timestamp,
+                entry.EventName,
+                entry.TableName,
+                entry.OperationType,
+                entry.UserId,
+                entry.UserName,
+                entry.IpAddress,
+                entry.Query,
+                BeforeImage = JsonSerializer.Serialize(entry.BeforeImage),
+                AfterImage = JsonSerializer.Serialize(entry.AfterImage),
+                CustomProperties = JsonSerializer.Serialize(entry.CustomProperties)
+            };
+
+            await connection.ExecuteAsync(sql, parameters);
+            _logger.LogInformation("Custom audit written to database: {EventName}", entry.EventName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to write custom audit to database");
+        }
+    }
+}</code></pre>
+
+            <h3 class="mt-4"><i class="fas fa-cogs me-2"></i>Usage Examples</h3>
+
+            <h4>File-Based Auditing</h4>
+            <pre><code class="language-csharp">// Program.cs
+builder.Services.AddDapperAuditInterceptor(
+    builder.Configuration.GetConnectionString("DefaultConnection")!,
+    new FileAuditWriter(
+        builder.Services.BuildServiceProvider().GetRequiredService&lt;ILogger&lt;FileAuditWriter&gt;&gt;(),
+        "audit.log"
+    )
+);</code></pre>
+
+            <h4>Factory Pattern with Configuration</h4>
+            <pre><code class="language-csharp">// Program.cs
+builder.Services.AddDapperAuditInterceptor(
+    builder.Configuration.GetConnectionString("DefaultConnection")!,
+    provider =>
+    {
+        var logger = provider.GetRequiredService&lt;ILogger&lt;FileAuditWriter&gt;&gt;();
+        var config = provider.GetRequiredService&lt;IConfiguration&gt;();
+        var filePath = config.GetValue&lt;string&gt;("AuditLogPath", "audit.log");
+        
+        return new FileAuditWriter(logger, filePath);
+    }
+);</code></pre>
+
+            <h4>Manual Registration with Multiple Writers</h4>
+            <pre><code class="language-csharp">// Program.cs
+builder.Services.AddSingleton&lt;IAuditWriter&gt;(provider =>
+{
+    var writers = new List&lt;IAuditWriter&gt;
+    {
+        new DefaultAuditWriter(
+            builder.Configuration.GetConnectionString("DefaultConnection")!,
+            provider.GetRequiredService&lt;ILogger&lt;DefaultAuditWriter&gt;&gt;()
+        ),
+        new FileAuditWriter(
+            provider.GetRequiredService&lt;ILogger&lt;FileAuditWriter&gt;&gt;(),
+            "audit.log"
+        )
+    };
+
+    return new ChainedAuditWriter(
+        writers,
+        provider.GetRequiredService&lt;ILogger&lt;ChainedAuditWriter&gt;&gt;()
+    );
+});
+
+builder.Services.AddDapperAuditInterceptorCore(
+    builder.Configuration.GetConnectionString("DefaultConnection")!
+);</code></pre>
+
+            <div class="alert alert-warning mt-4">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Important:</strong> Ensure your custom audit writer is thread-safe and handles exceptions gracefully to avoid affecting the main application flow.
+            </div>
+        </div>
+    </div>
+</section> 

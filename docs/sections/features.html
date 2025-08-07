@@ -9,19 +9,19 @@
                 <div class="col-md-6">
                     <h5><i class="fas fa-database me-2"></i>Database Operations</h5>
                     <ul>
-                        <li>INSERT operations with full entity capture</li>
+                        <li>INSERT operations with full entity capture using OUTPUT clause</li>
                         <li>UPDATE operations with before/after snapshots</li>
                         <li>DELETE operations with entity preservation</li>
-                        <li>Support for complex WHERE clauses</li>
-                        <li>Parameterized query handling</li>
+                        <li>Advanced SQL parsing with T-SQL ScriptDom</li>
+                        <li>Parameterized query handling and validation</li>
                     </ul>
                 </div>
                 <div class="col-md-6">
                     <h5><i class="fas fa-user me-2"></i>Context Tracking</h5>
                     <ul>
-                        <li>User identification and authentication</li>
+                        <li>Framework-agnostic user identification</li>
                         <li>IP address and user agent capture</li>
-                        <li>Custom property support</li>
+                        <li>Extensible custom property support</li>
                         <li>Machine and process information</li>
                         <li>Timestamp and thread tracking</li>
                     </ul>
@@ -32,21 +32,44 @@
                 <div class="col-md-6">
                     <h5><i class="fas fa-file-alt me-2"></i>Storage Options</h5>
                     <ul>
-                        <li>SQL Server database storage</li>
-                        <li>JSON file-based logging</li>
-                        <li>Custom audit writer implementations</li>
-                        <li>Configurable storage strategies</li>
-                        <li>Automatic table creation</li>
+                        <li>SQL Server database storage (default)</li>
+                        <li>File-based logging with JSON serialization</li>
+                        <li>Email notifications for critical events</li>
+                        <li>External API integration support</li>
+                        <li>Chained writers for multiple destinations</li>
                     </ul>
                 </div>
                 <div class="col-md-6">
-                    <h5><i class="fas fa-cogs me-2"></i>Integration</h5>
+                    <h5><i class="fas fa-cogs me-2"></i>Integration & Flexibility</h5>
                     <ul>
-                        <li>ASP.NET Core dependency injection</li>
+                        <li>Framework-agnostic dependency injection</li>
                         <li>Microsoft.Extensions.Logging support</li>
-                        <li>Configuration system integration</li>
-                        <li>HTTP context awareness</li>
-                        <li>Customizable audit context providers</li>
+                        <li>4 different registration methods</li>
+                        <li>Selective and conditional auditing</li>
+                        <li>Custom context providers</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <h5><i class="fas fa-rocket me-2"></i>Performance & Architecture</h5>
+                    <ul>
+                        <li>Minimal dependencies (no EF Core, no Dapper)</li>
+                        <li>Lightweight and fast execution</li>
+                        <li>Efficient SQL parsing and caching</li>
+                        <li>Thread-safe operations</li>
+                        <li>Async/await support throughout</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h5><i class="fas fa-shield-alt me-2"></i>Advanced Patterns</h5>
+                    <ul>
+                        <li>Chained audit writers</li>
+                        <li>Selective auditing by table/operation</li>
+                        <li>Conditional auditing by environment/role</li>
+                        <li>Multi-tenant context support</li>
+                        <li>Composite audit strategies</li>
                     </ul>
                 </div>
             </div>

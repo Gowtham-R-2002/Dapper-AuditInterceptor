@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+
+namespace Dapper.AuditInterceptor;
+
 public class AuditEntry
 {
     public DateTime Timestamp { get; set; }

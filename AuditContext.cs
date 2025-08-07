@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+using System.Collections.Generic;
 
 namespace Dapper.AuditInterceptor;
 
@@ -16,25 +16,17 @@ public interface IAuditContextProvider
     AuditContext GetCurrentContext();
 }
 
+// Default implementation (no ASP.NET Core dependency)
 public class AuditContextProvider : IAuditContextProvider
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
-
-    public AuditContextProvider(IHttpContextAccessor httpContextAccessor)
-    {
-        _httpContextAccessor = httpContextAccessor;
-    }
-
     public AuditContext GetCurrentContext()
     {
-        var context = _httpContextAccessor.HttpContext;
-        
         return new AuditContext
         {
-            UserId = context?.User?.Identity?.Name ?? "anonymous",
-            UserName = context?.User?.Identity?.Name ?? "Anonymous User",
-            IpAddress = context?.Connection?.RemoteIpAddress?.ToString() ?? "unknown",
-            UserAgent = context?.Request?.Headers["User-Agent"].FirstOrDefault() ?? "unknown"
+            UserId = "system",
+            UserName = "System User",
+            IpAddress = "unknown",
+            UserAgent = "unknown"
         };
     }
-} 
+}

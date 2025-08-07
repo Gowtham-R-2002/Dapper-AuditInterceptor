@@ -7,7 +7,7 @@
         <div class="card-body">
             <h5>1. Install the Package</h5>
             <div class="code-block">
-                <pre><code class="language-shell">dotnet add package Dapper.AuditInterceptor</code></pre>
+                <pre><code class="language-shell">dotnet add package GR.Dapper.AuditInterceptor</code></pre>
             </div>
 
             <h5>2. Configure Services</h5>
@@ -17,12 +17,9 @@ using Dapper.AuditInterceptor;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Dapper Audit Interceptor
+// Add Dapper Audit Interceptor with default database storage
 builder.Services.AddDapperAuditInterceptor(
     builder.Configuration.GetConnectionString("DefaultConnection")!);
-
-// Register audit writer
-builder.Services.AddSingleton<IAuditWriter, DefaultAuditWriter>();
 
 var app = builder.Build();</code></pre>
             </div>
@@ -58,7 +55,12 @@ var app = builder.Build();</code></pre>
 
             <div class="success">
                 <h6><i class="fas fa-check-circle me-2"></i>That's it!</h6>
-                <p>Your Dapper operations are now automatically audited. The interceptor will capture before/after snapshots and store them in the configured audit storage.</p>
+                <p>Your Dapper operations are now automatically audited with before/after snapshots. The interceptor uses SQL Server's OUTPUT clause for efficient entity capture.</p>
+            </div>
+
+            <div class="alert alert-info mt-3">
+                <h6><i class="fas fa-info-circle me-2"></i>Alternative Registration Methods</h6>
+                <p>For more advanced scenarios, you can use custom audit writers, factory patterns, or manual registration. See the <a href="#custom-audit-writers">Custom Audit Writers</a> section for details.</p>
             </div>
 
             <h5>4. Verify Installation</h5>

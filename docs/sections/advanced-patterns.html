@@ -1,0 +1,368 @@
+<!-- Advanced Patterns -->
+<section id="advanced-patterns">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-magic me-2"></i>Advanced Patterns</h2>
+        </div>
+        <div class="card-body">
+            <p class="lead">
+                Dapper Audit Interceptor v2.0.0 supports advanced patterns for complex audit scenarios. These patterns help you build sophisticated audit strategies while maintaining clean, maintainable code.
+            </p>
+
+            <h3><i class="fas fa-link me-2"></i>Chained Audit Writers</h3>
+            <p>Write audit entries to multiple destinations simultaneously using the chain of responsibility pattern.</p>
+
+            <pre><code class="language-csharp">public class ChainedAuditWriter : IAuditWriter
+{
+    private readonly IEnumerable&lt;IAuditWriter&gt; _writers;
+    private readonly ILogger&lt;ChainedAuditWriter&gt; _logger;
+
+    public ChainedAuditWriter(IEnumerable&lt;IAuditWriter&gt; writers, ILogger&lt;ChainedAuditWriter&gt; logger)
+    {
+        _writers = writers;
+        _logger = logger;
+    }
+
+    public async Task WriteAsync(AuditEntry entry)
+    {
+        var tasks = _writers.Select(writer => 
+        {
+            try
+            {
+                return writer.WriteAsync(entry);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to write audit entry to one of the writers");
+                return Task.CompletedTask;
+            }
+        });
+
+        await Task.WhenAll(tasks);
+    }
+}</code></pre>
+
+            <h4>Usage Example</h4>
+            <pre><code class="language-csharp">// Program.cs - Write to both database and file
+builder.Services.AddSingleton&lt;IAuditWriter&gt;(provider =>
+{
+    var writers = new List&lt;IAuditWriter&gt;
+    {
+        new DefaultAuditWriter(
+            builder.Configuration.GetConnectionString("DefaultConnection")!,
+            provider.GetRequiredService&lt;ILogger&lt;DefaultAuditWriter&gt;&gt;()
+        ),
+        new FileAuditWriter(
+            provider.GetRequiredService&lt;ILogger&lt;FileAuditWriter&gt;&gt;(),
+            "audit.log"
+        ),
+        new EmailAuditWriter(
+            provider.GetRequiredService&lt;ILogger&lt;EmailAuditWriter&gt;&gt;(),
+            "admin@company.com",
+            provider.GetRequiredService&lt;IEmailService&gt;()
+        )
+    };
+
+    return new ChainedAuditWriter(
+        writers,
+        provider.GetRequiredService&lt;ILogger&lt;ChainedAuditWriter&gt;&gt;()
+    );
+});
+
+builder.Services.AddDapperAuditInterceptorCore(
+    builder.Configuration.GetConnectionString("DefaultConnection")!
+);</code></pre>
+
+            <h3 class="mt-4"><i class="fas fa-filter me-2"></i>Selective Auditing</h3>
+            <p>Only audit specific tables or operations based on your business rules.</p>
+
+            <pre><code class="language-csharp">public class SelectiveAuditWriter : IAuditWriter
+{
+    private readonly IAuditWriter _innerWriter;
+    private readonly HashSet&lt;string&gt; _auditedTables;
+    private readonly HashSet&lt;string&gt; _auditedOperations;
+    private readonly ILogger&lt;SelectiveAuditWriter&gt; _logger;
+
+    public SelectiveAuditWriter(IAuditWriter innerWriter, ILogger&lt;SelectiveAuditWriter&gt; logger)
+    {
+        _innerWriter = innerWriter;
+        _logger = logger;
+        _auditedTables = new HashSet&lt;string&gt; { "Users", "Products", "Orders", "Permissions" };
+        _auditedOperations = new HashSet&lt;string&gt; { "Insert", "Update", "Delete" };
+    }
+
+    public async Task WriteAsync(AuditEntry entry)
+    {
+        if (_auditedTables.Contains(entry.TableName) && 
+            _auditedOperations.Contains(entry.OperationType))
+        {
+            await _innerWriter.WriteAsync(entry);
+            _logger.LogDebug("Audited table: {TableName}, operation: {OperationType}", 
+                           entry.TableName, entry.OperationType);
+        }
+        else
+        {
+            _logger.LogDebug("Skipped auditing table: {TableName}, operation: {OperationType}", 
+                           entry.TableName, entry.OperationType);
+        }
+    }
+}</code></pre>
+
+            <h4>Configuration-Based Selective Auditing</h4>
+            <pre><code class="language-csharp">public class ConfigurableSelectiveAuditWriter : IAuditWriter
+{
+    private readonly IAuditWriter _innerWriter;
+    private readonly IConfiguration _config;
+    private readonly ILogger&lt;ConfigurableSelectiveAuditWriter&gt; _logger;
+
+    public ConfigurableSelectiveAuditWriter(IAuditWriter innerWriter, 
+                                          IConfiguration config,
+                                          ILogger&lt;ConfigurableSelectiveAuditWriter&gt; logger)
+    {
+        _innerWriter = innerWriter;
+        _config = config;
+        _logger = logger;
+    }
+
+    public async Task WriteAsync(AuditEntry entry)
+    {
+        var auditedTables = _config.GetSection("AuditSettings:AuditedTables")
+                                  .Get&lt;string[]&gt;() ?? Array.Empty&lt;string&gt;();
+        
+        var auditedOperations = _config.GetSection("AuditSettings:AuditedOperations")
+                                     .Get&lt;string[]&gt;() ?? Array.Empty&lt;string&gt;();
+
+        if (auditedTables.Contains(entry.TableName) && 
+            auditedOperations.Contains(entry.OperationType))
+        {
+            await _innerWriter.WriteAsync(entry);
+        }
+    }
+}</code></pre>
+
+            <h3 class="mt-4"><i class="fas fa-toggle-on me-2"></i>Conditional Auditing</h3>
+            <p>Enable or disable auditing based on environment, user roles, or other conditions.</p>
+
+            <pre><code class="language-csharp">public class ConditionalAuditWriter : IAuditWriter
+{
+    private readonly IAuditWriter _defaultWriter;
+    private readonly IAuditWriter _customWriter;
+    private readonly IConfiguration _config;
+    private readonly ILogger&lt;ConditionalAuditWriter&gt; _logger;
+
+    public ConditionalAuditWriter(
+        IAuditWriter defaultWriter,
+        IAuditWriter customWriter,
+        IConfiguration config,
+        ILogger&lt;ConditionalAuditWriter&gt; logger)
+    {
+        _defaultWriter = defaultWriter;
+        _customWriter = customWriter;
+        _config = config;
+        _logger = logger;
+    }
+
+    public async Task WriteAsync(AuditEntry entry)
+    {
+        var useCustomWriter = _config.GetValue&lt;bool&gt;("UseCustomAuditWriter", false);
+        var environment = _config.GetValue&lt;string&gt;("Environment", "development");
+        
+        if (useCustomWriter && environment == "production")
+        {
+            await _customWriter.WriteAsync(entry);
+        }
+        else
+        {
+            await _defaultWriter.WriteAsync(entry);
+        }
+    }
+}</code></pre>
+
+            <h4>Role-Based Conditional Auditing</h4>
+            <pre><code class="language-csharp">public class RoleBasedAuditWriter : IAuditWriter
+{
+    private readonly IAuditWriter _innerWriter;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ILogger&lt;RoleBasedAuditWriter&gt; _logger;
+
+    public RoleBasedAuditWriter(IAuditWriter innerWriter,
+                               IHttpContextAccessor httpContextAccessor,
+                               ILogger&lt;RoleBasedAuditWriter&gt; logger)
+    {
+        _innerWriter = innerWriter;
+        _httpContextAccessor = httpContextAccessor;
+        _logger = logger;
+    }
+
+    public async Task WriteAsync(AuditEntry entry)
+    {
+        var context = _httpContextAccessor.HttpContext;
+        var user = context?.User;
+
+        // Only audit admin actions or sensitive operations
+        if (user?.IsInRole("Admin") == true || 
+            entry.TableName == "Users" || 
+            entry.TableName == "Permissions" ||
+            entry.OperationType == "Delete")
+        {
+            await _innerWriter.WriteAsync(entry);
+        }
+    }
+}</code></pre>
+
+            <h3 class="mt-4"><i class="fas fa-user-cog me-2"></i>Custom Context Providers</h3>
+            <p>Enhance audit context with custom user information, tenant data, or business context.</p>
+
+            <pre><code class="language-csharp">public class EnhancedAuditContextProvider : IAuditContextProvider
+{
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IConfiguration _config;
+    private readonly ITenantService _tenantService;
+
+    public EnhancedAuditContextProvider(IHttpContextAccessor httpContextAccessor,
+                                      IConfiguration config,
+                                      ITenantService tenantService)
+    {
+        _httpContextAccessor = httpContextAccessor;
+        _config = config;
+        _tenantService = tenantService;
+    }
+
+    public AuditContext GetCurrentContext()
+    {
+        var context = _httpContextAccessor.HttpContext;
+        var user = context?.User;
+        var tenant = _tenantService.GetCurrentTenant();
+        
+        return new AuditContext
+        {
+            UserId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous",
+            UserName = user?.Identity?.Name ?? "Anonymous User",
+            IpAddress = context?.Connection?.RemoteIpAddress?.ToString() ?? "unknown",
+            UserAgent = context?.Request?.Headers["User-Agent"].FirstOrDefault() ?? "unknown",
+            CustomProperties = new Dictionary&lt;string, object&gt;
+            {
+                ["TenantId"] = tenant?.Id ?? "default",
+                ["TenantName"] = tenant?.Name ?? "Default Tenant",
+                ["Environment"] = _config.GetValue&lt;string&gt;("Environment", "development"),
+                ["RequestId"] = context?.TraceIdentifier ?? Guid.NewGuid().ToString(),
+                ["UserRoles"] = string.Join(",", user?.Claims
+                    .Where(c => c.Type == ClaimTypes.Role)
+                    .Select(c => c.Value) ?? Array.Empty&lt;string&gt;()),
+                ["RequestMethod"] = context?.Request?.Method ?? "unknown",
+                ["RequestPath"] = context?.Request?.Path ?? "unknown"
+            }
+        };
+    }
+}</code></pre>
+
+            <h4>Multi-Tenant Context Provider</h4>
+            <pre><code class="language-csharp">public class MultiTenantAuditContextProvider : IAuditContextProvider
+{
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ITenantResolver _tenantResolver;
+
+    public MultiTenantAuditContextProvider(IHttpContextAccessor httpContextAccessor,
+                                         ITenantResolver tenantResolver)
+    {
+        _httpContextAccessor = httpContextAccessor;
+        _tenantResolver = tenantResolver;
+    }
+
+    public AuditContext GetCurrentContext()
+    {
+        var context = _httpContextAccessor.HttpContext;
+        var tenant = _tenantResolver.ResolveTenant(context);
+        
+        return new AuditContext
+        {
+            UserId = context?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous",
+            UserName = context?.User?.Identity?.Name ?? "Anonymous User",
+            IpAddress = context?.Connection?.RemoteIpAddress?.ToString() ?? "unknown",
+            UserAgent = context?.Request?.Headers["User-Agent"].FirstOrDefault() ?? "unknown",
+            CustomProperties = new Dictionary&lt;string, object&gt;
+            {
+                ["TenantId"] = tenant?.Id,
+                ["TenantName"] = tenant?.Name,
+                ["TenantDomain"] = tenant?.Domain,
+                ["IsMultiTenant"] = true
+            }
+        };
+    }
+}</code></pre>
+
+            <h3 class="mt-4"><i class="fas fa-layer-group me-2"></i>Composite Patterns</h3>
+            <p>Combine multiple patterns for sophisticated audit strategies.</p>
+
+            <pre><code class="language-csharp">// Composite pattern combining selective, conditional, and chained auditing
+public class CompositeAuditStrategy
+{
+    public static IAuditWriter CreateAuditStrategy(IServiceProvider provider)
+    {
+        var config = provider.GetRequiredService&lt;IConfiguration&gt;();
+        var logger = provider.GetRequiredService&lt;ILogger&lt;CompositeAuditStrategy&gt;&gt;();
+
+        // Create base writers
+        var databaseWriter = new DefaultAuditWriter(
+            config.GetConnectionString("DefaultConnection")!,
+            provider.GetRequiredService&lt;ILogger&lt;DefaultAuditWriter&gt;&gt;()
+        );
+
+        var fileWriter = new FileAuditWriter(
+            provider.GetRequiredService&lt;ILogger&lt;FileAuditWriter&gt;&gt;(),
+            config.GetValue&lt;string&gt;("AuditLogPath", "audit.log")
+        );
+
+        var emailWriter = new EmailAuditWriter(
+            provider.GetRequiredService&lt;ILogger&lt;EmailAuditWriter&gt;&gt;(),
+            config.GetValue&lt;string&gt;("AdminEmail", "admin@company.com"),
+            provider.GetRequiredService&lt;IEmailService&gt;()
+        );
+
+        // Create selective writer for critical operations
+        var criticalWriter = new SelectiveAuditWriter(
+            new ChainedAuditWriter(
+                new[] { databaseWriter, emailWriter },
+                provider.GetRequiredService&lt;ILogger&lt;ChainedAuditWriter&gt;&gt;()
+            ),
+            provider.GetRequiredService&lt;ILogger&lt;SelectiveAuditWriter&gt;&gt;()
+        );
+
+        // Create conditional writer based on environment
+        var environment = config.GetValue&lt;string&gt;("Environment", "development");
+        
+        if (environment == "production")
+        {
+            return new ChainedAuditWriter(
+                new[] { criticalWriter, fileWriter },
+                logger
+            );
+        }
+        else
+        {
+            return fileWriter; // Only file logging in development
+        }
+    }
+}</code></pre>
+
+            <h4>Usage in Program.cs</h4>
+            <pre><code class="language-csharp">// Program.cs
+builder.Services.AddSingleton&lt;IAuditWriter&gt;(provider => 
+    CompositeAuditStrategy.CreateAuditStrategy(provider));
+
+builder.Services.AddDapperAuditInterceptorCore(
+    builder.Configuration.GetConnectionString("DefaultConnection")!
+);</code></pre>
+
+            <div class="alert alert-info mt-4">
+                <i class="fas fa-lightbulb me-2"></i>
+                <strong>Tip:</strong> These patterns can be mixed and matched to create sophisticated audit strategies that meet your specific business requirements.
+            </div>
+
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Performance Consideration:</strong> When using chained writers, consider the performance impact of multiple I/O operations. Use async/await properly and consider implementing retry logic for critical audit operations.
+            </div>
+        </div>
+    </div>
+</section> 

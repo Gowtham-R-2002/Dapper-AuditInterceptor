@@ -1,28 +1,29 @@
 # Dapper Audit Interceptor
 
-[![NuGet](https://img.shields.io/nuget/v/Dapper.AuditInterceptor.svg)](https://www.nuget.org/packages/GR.Dapper.AuditInterceptor)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![NuGet](https://img.shields.io/nuget/v/GR.Dapper.AuditInterceptor.svg)](https://www.nuget.org/packages/GR.Dapper.AuditInterceptor)
 
-A powerful .NET library that provides transparent before/after auditing for Dapper ORM operations with zero repository modification required.
+A powerful, lightweight .NET library that provides transparent before/after auditing for Dapper ORM operations with zero repository modification required. Built with minimal dependencies and maximum flexibility.
 
 ## 🚀 Features
 
 - **Zero Code Changes**: Works with existing Dapper repositories without modification
-- **Automatic Entity Snapshots**: Captures before and after states of entities
-- **SQL Parsing**: Intelligent parsing of INSERT, UPDATE, and DELETE operations
+- **Automatic Entity Snapshots**: Captures before and after states of entities using SQL Server's OUTPUT clause
+- **Intelligent SQL Parsing**: Advanced parsing of INSERT, UPDATE, and DELETE operations
 - **Context Awareness**: Captures user context, IP address, and custom properties
-- **Flexible Storage**: Supports both file-based and database audit logging
-- **Performance Optimized**: Minimal overhead with efficient SQL parsing
+- **Framework Agnostic**: Works with ASP.NET Core, console apps, Windows services, and more
+- **Flexible Storage**: Multiple audit writer implementations and easy customization
+- **Performance Optimized**: Minimal overhead with efficient SQL parsing and caching
+- **Lightweight**: Minimal dependencies, no EF Core or ASP.NET Core requirements
 
 ## 📦 Installation
 
 ```bash
-dotnet add package Dapper.AuditInterceptor
+dotnet add package GR.Dapper.AuditInterceptor
 ```
 
 ## 🏃‍♂️ Quick Start
 
-### 1. Configure Services
+### 1. Basic Configuration (Default Database Storage)
 
 ```csharp
 // Program.cs or Startup.cs
@@ -30,17 +31,14 @@ using Dapper.AuditInterceptor;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Dapper Audit Interceptor
+// Add Dapper Audit Interceptor with default database storage
 builder.Services.AddDapperAuditInterceptor(
     builder.Configuration.GetConnectionString("DefaultConnection")!);
-
-// Register audit writer
-builder.Services.AddSingleton<IAuditWriter, DefaultAuditWriter>();
 
 var app = builder.Build();
 ```
 
-### 2. Use in Repository
+### 2. Use in Repository (No Changes Required!)
 
 ```csharp
 public class UserRepository
@@ -67,10 +65,18 @@ public class UserRepository
         var sql = "UPDATE Users SET Name = @Name, Email = @Email WHERE Id = @Id";
         return await connection.ExecuteAsync(sql, user);
     }
+
+    public async Task<int> DeleteUserAsync(int id)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        
+        var sql = "DELETE FROM Users WHERE Id = @Id";
+        return await connection.ExecuteAsync(sql, new { Id = id });
+    }
 }
 ```
 
-That's it! Your Dapper operations are now automatically audited.
+That's it! Your Dapper operations are now automatically audited with before/after snapshots.
 
 ## 🔧 Configuration
 
@@ -88,24 +94,257 @@ That's it! Your Dapper operations are now automatically audited.
 }
 ```
 
-### Custom Audit Writer
-```csharp
-public class CustomAuditWriter : IAuditWriter
-{
-    private readonly ILogger<CustomAuditWriter> _logger;
+## 🎯 Advanced Usage - Custom Audit Writers
 
-    public CustomAuditWriter(ILogger<CustomAuditWriter> logger)
+### Option 1: Custom Audit Writer Instance
+
+```csharp
+// CustomAuditWriter.cs
+public class FileAuditWriter : IAuditWriter
+{
+    private readonly ILogger<FileAuditWriter> _logger;
+    private readonly string _filePath;
+
+    public FileAuditWriter(ILogger<FileAuditWriter> logger, string filePath)
     {
+        _logger = logger;
+        _filePath = filePath;
+    }
+
+    public async Task WriteAsync(AuditEntry entry)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(entry, new JsonSerializerOptions 
+            { 
+                WriteIndented = true 
+            });
+            
+            await File.AppendAllTextAsync(_filePath, json + Environment.NewLine);
+            _logger.LogInformation("Audit written to file: {EventName}", entry.EventName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to write audit to file");
+        }
+    }
+}
+
+// Program.cs
+builder.Services.AddDapperAuditInterceptor(
+    builder.Configuration.GetConnectionString("DefaultConnection")!,
+    new FileAuditWriter(
+        builder.Services.BuildServiceProvider().GetRequiredService<ILogger<FileAuditWriter>>(),
+        "audit.log"
+    )
+);
+```
+
+### Option 2: Factory Pattern
+
+```csharp
+// Program.cs
+builder.Services.AddDapperAuditInterceptor(
+    builder.Configuration.GetConnectionString("DefaultConnection")!,
+    provider =>
+    {
+        var logger = provider.GetRequiredService<ILogger<FileAuditWriter>>();
+        var config = provider.GetRequiredService<IConfiguration>();
+        var filePath = config.GetValue<string>("AuditLogPath", "audit.log");
+        
+        return new FileAuditWriter(logger, filePath);
+    }
+);
+```
+
+### Option 3: Manual Registration (Maximum Control)
+
+```csharp
+// Program.cs
+// Register your custom audit writer
+builder.Services.AddSingleton<IAuditWriter>(provider =>
+{
+    var logger = provider.GetRequiredService<ILogger<FileAuditWriter>>();
+    var config = provider.GetRequiredService<IConfiguration>();
+    var filePath = config.GetValue<string>("AuditLogPath", "audit.log");
+    
+    return new FileAuditWriter(logger, filePath);
+});
+
+// Register the core interceptor
+builder.Services.AddDapperAuditInterceptorCore(
+    builder.Configuration.GetConnectionString("DefaultConnection")!
+);
+```
+
+## 🔗 Chained Audit Writers (Multiple Storage)
+
+```csharp
+// ChainedAuditWriter.cs
+public class ChainedAuditWriter : IAuditWriter
+{
+    private readonly IEnumerable<IAuditWriter> _writers;
+    private readonly ILogger<ChainedAuditWriter> _logger;
+
+    public ChainedAuditWriter(IEnumerable<IAuditWriter> writers, ILogger<ChainedAuditWriter> logger)
+    {
+        _writers = writers;
         _logger = logger;
     }
 
-    public async Task WriteAsync(AuditEntry auditEntry)
+    public async Task WriteAsync(AuditEntry entry)
     {
-        // Custom audit storage logic
-        _logger.LogInformation("Custom audit: {EventName}", auditEntry.EventName);
-        await Task.CompletedTask;
+        var tasks = _writers.Select(writer => 
+        {
+            try
+            {
+                return writer.WriteAsync(entry);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to write audit entry to one of the writers");
+                return Task.CompletedTask;
+            }
+        });
+
+        await Task.WhenAll(tasks);
     }
 }
+
+// Program.cs - Write to both database and file
+builder.Services.AddSingleton<IAuditWriter>(provider =>
+{
+    var writers = new List<IAuditWriter>
+    {
+        new DefaultAuditWriter(
+            builder.Configuration.GetConnectionString("DefaultConnection")!,
+            provider.GetRequiredService<ILogger<DefaultAuditWriter>>()
+        ),
+        new FileAuditWriter(
+            provider.GetRequiredService<ILogger<FileAuditWriter>>(),
+            "audit.log"
+        )
+    };
+
+    return new ChainedAuditWriter(
+        writers,
+        provider.GetRequiredService<ILogger<ChainedAuditWriter>>()
+    );
+});
+
+builder.Services.AddDapperAuditInterceptorCore(
+    builder.Configuration.GetConnectionString("DefaultConnection")!
+);
+```
+
+## 🎛️ Selective Auditing
+
+```csharp
+// SelectiveAuditWriter.cs
+public class SelectiveAuditWriter : IAuditWriter
+{
+    private readonly IAuditWriter _innerWriter;
+    private readonly HashSet<string> _auditedTables;
+    private readonly ILogger<SelectiveAuditWriter> _logger;
+
+    public SelectiveAuditWriter(IAuditWriter innerWriter, ILogger<SelectiveAuditWriter> logger)
+    {
+        _innerWriter = innerWriter;
+        _logger = logger;
+        _auditedTables = new HashSet<string> { "Users", "Products", "Orders" };
+    }
+
+    public async Task WriteAsync(AuditEntry entry)
+    {
+        if (_auditedTables.Contains(entry.TableName))
+        {
+            await _innerWriter.WriteAsync(entry);
+            _logger.LogDebug("Audited table: {TableName}", entry.TableName);
+        }
+        else
+        {
+            _logger.LogDebug("Skipped auditing table: {TableName}", entry.TableName);
+        }
+    }
+}
+```
+
+## 🔄 Conditional Auditing
+
+```csharp
+// ConditionalAuditWriter.cs
+public class ConditionalAuditWriter : IAuditWriter
+{
+    private readonly IAuditWriter _defaultWriter;
+    private readonly IAuditWriter _customWriter;
+    private readonly IConfiguration _config;
+    private readonly ILogger<ConditionalAuditWriter> _logger;
+
+    public ConditionalAuditWriter(
+        IAuditWriter defaultWriter,
+        IAuditWriter customWriter,
+        IConfiguration config,
+        ILogger<ConditionalAuditWriter> logger)
+    {
+        _defaultWriter = defaultWriter;
+        _customWriter = customWriter;
+        _config = config;
+        _logger = logger;
+    }
+
+    public async Task WriteAsync(AuditEntry entry)
+    {
+        var useCustomWriter = _config.GetValue<bool>("UseCustomAuditWriter", false);
+        
+        if (useCustomWriter)
+        {
+            await _customWriter.WriteAsync(entry);
+        }
+        else
+        {
+            await _defaultWriter.WriteAsync(entry);
+        }
+    }
+}
+```
+
+## 🎭 Custom Context Providers
+
+```csharp
+// CustomAuditContextProvider.cs
+public class CustomAuditContextProvider : IAuditContextProvider
+{
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IConfiguration _config;
+
+    public CustomAuditContextProvider(IHttpContextAccessor httpContextAccessor, IConfiguration config)
+    {
+        _httpContextAccessor = httpContextAccessor;
+        _config = config;
+    }
+
+    public AuditContext GetCurrentContext()
+    {
+        var context = _httpContextAccessor.HttpContext;
+        
+        return new AuditContext
+        {
+            UserId = context?.User?.Identity?.Name ?? "anonymous",
+            UserName = context?.User?.Identity?.Name ?? "Anonymous User",
+            IpAddress = context?.Connection?.RemoteIpAddress?.ToString() ?? "unknown",
+            UserAgent = context?.Request?.Headers["User-Agent"].FirstOrDefault() ?? "unknown",
+            CustomProperties = new Dictionary<string, object>
+            {
+                ["TenantId"] = _config.GetValue<string>("TenantId", "default"),
+                ["Environment"] = _config.GetValue<string>("Environment", "development"),
+                ["RequestId"] = context?.TraceIdentifier ?? Guid.NewGuid().ToString()
+            }
+        };
+    }
+}
+
+// Program.cs
+builder.Services.AddSingleton<IAuditContextProvider, CustomAuditContextProvider>();
 ```
 
 ## 📊 Database Schema
@@ -158,73 +397,53 @@ AND JSON_VALUE(Parameters, '$.Id') = '123'
 ORDER BY Timestamp DESC;
 ```
 
+### Get before/after images for updates
+```sql
+SELECT 
+    Timestamp,
+    EventName,
+    JSON_VALUE(BeforeImage, '$.Name') as OldName,
+    JSON_VALUE(AfterImage, '$.Name') as NewName
+FROM AuditLogs 
+WHERE TableName = 'Users' 
+AND EventName LIKE '%Modified%'
+ORDER BY Timestamp DESC;
+```
+
 ## 🏗️ Architecture
 
 The library consists of several key components:
 
 - **AuditableDbConnection**: Wraps SQL connections to intercept commands
-- **EntitySnapshotAuditableDbCommand**: Intercepts and audits SQL commands
-- **TSqlStatementParser**: Parses SQL statements for audit operations
-- **AuditContextProvider**: Provides user and request context
-- **IAuditWriter**: Interface for audit storage strategies
+- **EntitySnapshotAuditableDbCommand**: Intercepts and audits SQL commands using OUTPUT clause
+- **TSqlStatementParser**: Advanced SQL parsing for INSERT, UPDATE, and DELETE operations
+- **AuditContextProvider**: Provides user and request context (framework agnostic)
+- **IAuditWriter**: Interface for audit storage strategies (highly extensible)
+- **DefaultAuditWriter**: Database-based audit storage implementation
 
-## 📚 Documentation
+## 📦 Dependencies
 
-For comprehensive documentation, visit the [Documentation](docs/index.html) folder.
+**Core Dependencies (Minimal):**
+- Microsoft.Data.SqlClient (5.1.2) - SQL Server connectivity
+- Microsoft.Extensions.DependencyInjection.Abstractions (8.0.0) - DI support
+- Microsoft.Extensions.Logging.Abstractions (8.0.0) - Logging support
+- Microsoft.SqlServer.TransactSql.ScriptDom (170.53.0) - SQL parsing
 
-## 🛠️ Advanced Usage
+**Optional Dependencies:**
+- Microsoft.AspNetCore.Http.Abstractions (2.3.0) - ASP.NET Core context support
+- Microsoft.AspNetCore.Http (2.3.0) - ASP.NET Core context support
 
-### Custom Context Provider
-```csharp
-public class CustomAuditContextProvider : IAuditContextProvider
-{
-    public AuditContext GetCurrentContext()
-    {
-        return new AuditContext
-        {
-            UserId = "custom-user-id",
-            UserName = "Custom User",
-            IpAddress = "192.168.1.1",
-            UserAgent = "Custom Agent",
-            CustomProperties = new Dictionary<string, object>
-            {
-                ["TenantId"] = "tenant-123",
-                ["Environment"] = "production"
-            }
-        };
-    }
-}
-```
-
-### Selective Auditing
-```csharp
-public class SelectiveAuditWriter : IAuditWriter
-{
-    private readonly IAuditWriter _innerWriter;
-    private readonly HashSet<string> _auditedTables;
-
-    public SelectiveAuditWriter(IAuditWriter innerWriter)
-    {
-        _innerWriter = innerWriter;
-        _auditedTables = new HashSet<string> { "Users", "Products", "Orders" };
-    }
-
-    public async Task WriteAsync(AuditEntry auditEntry)
-    {
-        if (_auditedTables.Contains(auditEntry.TableName))
-        {
-            await _innerWriter.WriteAsync(auditEntry);
-        }
-    }
-}
-```
+**Removed Dependencies:**
+- ❌ Dapper (not required by the interceptor)
+- ❌ Newtonsoft.Json (replaced with System.Text.Json)
+- ❌ Microsoft.EntityFrameworkCore (removed unnecessary dependencies)
+- ❌ Audit.NET (not used)
 
 ## 🔧 Requirements
 
 - .NET 10.0 or later
-- Dapper 2.1.35 or later
-- Microsoft.Data.SqlClient 5.1.2 or later
-- SQL Server database (for database audit storage)
+- SQL Server database (for default audit storage)
+- Dapper (in consuming applications, not required by the library)
 
 ## 🐛 Troubleshooting
 
@@ -234,16 +453,32 @@ public class SelectiveAuditWriter : IAuditWriter
 - Check that you're using `IDbConnectionFactory.CreateConnection()` instead of direct SqlConnection
 - Verify that the SQL operations are INSERT, UPDATE, or DELETE statements
 - Ensure the audit writer is properly registered in DI container
+- Check that the connection string is valid and accessible
 
 **Performance issues**
 - Monitor the SQL parsing overhead for complex queries
 - Check if audit table has proper indexes
 - Consider implementing custom audit writer for high-volume scenarios
+- Use selective auditing to reduce unnecessary audit records
 
 **SQL parsing errors**
 - Ensure SQL statements are valid T-SQL
 - Check for unsupported SQL constructs (CTEs, complex subqueries)
 - Verify parameter names match between SQL and C# code
+- Review logs for specific parsing error details
+
+**Dependency injection errors**
+- Ensure only one `IAuditWriter` is registered
+- Check that all required services are properly registered
+- Verify connection string is provided to the extension method
+
+## 🚀 Performance Tips
+
+1. **Use Selective Auditing**: Only audit critical tables
+2. **Implement Caching**: Cache table column information
+3. **Batch Processing**: Consider batching audit writes for high-volume scenarios
+4. **Index Optimization**: Add proper indexes to the AuditLogs table
+5. **Connection Pooling**: Ensure proper connection string configuration
 
 ## 🤝 Contributing
 
@@ -259,6 +494,11 @@ For support, please open an issue on the GitHub repository or contact the mainta
 
 ## 📈 Roadmap
 
+- [x] Framework agnostic design
+- [x] Minimal dependencies
+- [x] Custom audit writer support
+- [x] Chained audit writers
+- [x] Selective auditing
 - [ ] Support for PostgreSQL
 - [ ] Support for MySQL
 - [ ] Real-time audit streaming
@@ -270,4 +510,4 @@ For support, please open an issue on the GitHub repository or contact the mainta
 
 - [Dapper](https://github.com/DapperLib/Dapper) - The micro ORM that makes this possible
 - [Microsoft.Data.SqlClient](https://github.com/dotnet/SqlClient) - SQL Server client library
-- [Audit.NET](https://github.com/thepirat000/Audit.NET) - Inspiration for audit patterns 
+- [Microsoft.SqlServer.TransactSql.ScriptDom](https://github.com/microsoft/sql-server-samples) - SQL parsing capabilities 

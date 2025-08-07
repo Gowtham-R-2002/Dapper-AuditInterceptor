@@ -6,18 +6,19 @@
         </div>
         <div class="card-body">
             <p class="lead">
-                Dapper Audit Interceptor is a powerful .NET library that provides transparent before/after auditing for Dapper ORM operations with zero repository modification required.
+                Dapper Audit Interceptor v2.0.0 is a powerful, lightweight .NET library that provides transparent before/after auditing for Dapper ORM operations with zero repository modification required. Built with minimal dependencies and maximum flexibility.
             </p>
             
             <div class="highlight">
                 <h5><i class="fas fa-info-circle me-2"></i>Key Benefits</h5>
                 <ul>
                     <li><strong>Zero Code Changes:</strong> Works with existing Dapper repositories without modification</li>
-                    <li><strong>Automatic Entity Snapshots:</strong> Captures before and after states of entities</li>
-                    <li><strong>SQL Parsing:</strong> Intelligent parsing of INSERT, UPDATE, and DELETE operations</li>
-                    <li><strong>Context Awareness:</strong> Captures user context, IP address, and custom properties</li>
-                    <li><strong>Flexible Storage:</strong> Supports both file-based and database audit logging</li>
-                    <li><strong>Performance Optimized:</strong> Minimal overhead with efficient SQL parsing</li>
+                    <li><strong>Automatic Entity Snapshots:</strong> Captures before and after states using SQL Server's OUTPUT clause</li>
+                    <li><strong>Intelligent SQL Parsing:</strong> Advanced parsing of INSERT, UPDATE, and DELETE operations</li>
+                    <li><strong>Framework Agnostic:</strong> Works with ASP.NET Core, console apps, Windows services, and more</li>
+                    <li><strong>Flexible Storage:</strong> Multiple audit writer implementations and easy customization</li>
+                    <li><strong>Performance Optimized:</strong> Minimal overhead with efficient SQL parsing and caching</li>
+                    <li><strong>Lightweight:</strong> Minimal dependencies, no EF Core or ASP.NET Core requirements</li>
                 </ul>
             </div>
 

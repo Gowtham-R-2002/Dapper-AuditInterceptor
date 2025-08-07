@@ -1,18 +1,25 @@
-using System.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Dapper.AuditInterceptor;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
+using Dapper.AuditInterceptor;
 
 public class DefaultAuditWriter : IAuditWriter
 {
     private readonly string _connectionString;
     private readonly ILogger<DefaultAuditWriter> _logger;
-
-    public DefaultAuditWriter(IConfiguration config, ILogger<DefaultAuditWriter> logger)
+     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
-        _connectionString = config.GetConnectionString("DefaultConnection")!;
+        WriteIndented = false,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    public DefaultAuditWriter(string connectionString, ILogger<DefaultAuditWriter> logger)
+    {
+        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         _logger = logger;
     }
 
@@ -44,9 +51,9 @@ public class DefaultAuditWriter : IAuditWriter
             cmd.Parameters.AddWithValue("@Timestamp", entry.Timestamp);
             cmd.Parameters.AddWithValue("@EventName", entry.EventName ?? (object)DBNull.Value);
             cmd.Parameters.AddWithValue("@Query", entry.Query ?? (object)DBNull.Value);
-            cmd.Parameters.AddWithValue("@Parameters", JsonConvert.SerializeObject(entry.Parameters ?? new Dictionary<string, object>()));
-            cmd.Parameters.AddWithValue("@BeforeImage", JsonConvert.SerializeObject(entry.BeforeImage ?? new Dictionary<string, object>()));
-            cmd.Parameters.AddWithValue("@AfterImage", JsonConvert.SerializeObject(entry.AfterImage ?? new Dictionary<string, object>()));
+            cmd.Parameters.AddWithValue("@Parameters", JsonSerializer.Serialize(entry.Parameters ?? new Dictionary<string, object>()));
+            cmd.Parameters.AddWithValue("@BeforeImage", JsonSerializer.Serialize(entry.BeforeImage ?? new Dictionary<string, object>()));
+            cmd.Parameters.AddWithValue("@AfterImage", JsonSerializer.Serialize(entry.AfterImage ?? new Dictionary<string, object>()));
             cmd.Parameters.AddWithValue("@TableName", entry.TableName ?? (object)DBNull.Value);
             cmd.Parameters.AddWithValue("@UserId", entry?.UserId ?? (object)DBNull.Value);
             cmd.Parameters.AddWithValue("@UserName", entry?.UserName ?? (object)DBNull.Value);
@@ -55,7 +62,7 @@ public class DefaultAuditWriter : IAuditWriter
             cmd.Parameters.AddWithValue("@MachineName", entry.MachineName ?? (object)DBNull.Value);
             cmd.Parameters.AddWithValue("@ProcessId", entry.ProcessId);
             cmd.Parameters.AddWithValue("@ThreadId", entry.ThreadId);
-            cmd.Parameters.AddWithValue("@CustomProperties", JsonConvert.SerializeObject(entry.CustomProperties ?? new Dictionary<string, object>()));
+            cmd.Parameters.AddWithValue("@CustomProperties", JsonSerializer.Serialize(entry.CustomProperties ?? new Dictionary<string, object>()));
 
             await cmd.ExecuteNonQueryAsync();
 

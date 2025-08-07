@@ -3,28 +3,29 @@
 	<TargetFramework>net10.0</TargetFramework>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>GR.Dapper.AuditInterceptor</PackageId>
-    <Version>1.0.0</Version>
+    <Version>2.0.0</Version>
     <Authors>Gowtham R</Authors>
     <Company>Gowtham R</Company>
-    <Description>Transparent before/after auditing for Dapper with zero repository modification.</Description>
+    <Description>Lightweight, framework-agnostic before/after auditing for Dapper with minimal dependencies and maximum flexibility.</Description>
     <PackageTags>dapper audit logging interceptor</PackageTags>
-    <RepositoryUrl>https://github.com/yourusername/Dapper.AuditInterceptor</RepositoryUrl>
+    <RepositoryUrl>https://github.com/Gowtham-R-2002/Dapper-AuditInterceptor</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Gowtham-R-2002/Dapper-AuditInterceptor</PackageProjectUrl>
+    <PackageIcon>icon.png</PackageIcon>
   </PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="Dapper" Version="2.1.35" />
-		<PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.3.0" />
 		<PackageReference Include="Microsoft.Data.SqlClient" Version="5.1.2" />
-		<PackageReference Include="Audit.NET" Version="25.0.1" />
-		<PackageReference Include="Audit.NET.SqlServer" Version="25.0.1" />
-		<PackageReference Include="Microsoft.AspNetCore.Http" Version="2.3.0" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
 		<PackageReference Include="Microsoft.SqlServer.TransactSql.ScriptDom" Version="170.53.0" />
-		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 	</ItemGroup>
+
+	<!-- Include README.md and LICENSE in the NuGet package -->
 	<ItemGroup>
-	  <Folder Include="SQLHelper\" />
+		<None Include="README.md" Pack="true" PackagePath="/" />
+		<None Include="LICENSE" Pack="true" PackagePath="/" />
+		<None Include="icon.png" Pack="true" PackagePath="/" Condition="Exists('icon.png')" />
 	</ItemGroup>
 
 </Project>
